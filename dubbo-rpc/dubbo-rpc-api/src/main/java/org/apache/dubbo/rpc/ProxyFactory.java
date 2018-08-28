@@ -28,7 +28,7 @@ import org.apache.dubbo.common.extension.SPI;
 public interface ProxyFactory {
 
     /**
-     * create proxy.
+     * create proxy. 引用服务使用
      *
      * @param invoker
      * @return proxy
@@ -37,7 +37,7 @@ public interface ProxyFactory {
     <T> T getProxy(Invoker<T> invoker) throws RpcException;
 
     /**
-     * create proxy.
+     * create proxy. 暴露服务使用
      *
      * @param invoker
      * @return proxy
