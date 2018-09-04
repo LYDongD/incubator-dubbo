@@ -125,8 +125,11 @@ public abstract class AbstractProxyProtocol extends AbstractProtocol {
         return re;
     }
 
+    //获取需要绑定的地址：ip + port
     protected String getAddr(URL url) {
         String bindIp = url.getParameter(Constants.BIND_IP_KEY, url.getHost());
+
+        //如果anyHost=true,则bindIp设置为0.0.0.0
         if (url.getParameter(Constants.ANYHOST_KEY, false)) {
             bindIp = Constants.ANYHOST_VALUE;
         }

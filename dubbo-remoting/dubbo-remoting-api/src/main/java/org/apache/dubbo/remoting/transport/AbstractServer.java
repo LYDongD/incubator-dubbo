@@ -53,9 +53,11 @@ public abstract class AbstractServer extends AbstractEndpoint implements Server 
 
         String bindIp = getUrl().getParameter(Constants.BIND_IP_KEY, getUrl().getHost());
         int bindPort = getUrl().getParameter(Constants.BIND_PORT_KEY, getUrl().getPort());
+        //如果anyhost=true，绑定0.0.0.0
         if (url.getParameter(Constants.ANYHOST_KEY, false) || NetUtils.isInvalidLocalHost(bindIp)) {
             bindIp = NetUtils.ANYHOST;
         }
+        //绑定ip
         bindAddress = new InetSocketAddress(bindIp, bindPort);
         this.accepts = url.getParameter(Constants.ACCEPTS_KEY, Constants.DEFAULT_ACCEPTS);
         this.idleTimeout = url.getParameter(Constants.IDLE_TIMEOUT_KEY, Constants.DEFAULT_IDLE_TIMEOUT);

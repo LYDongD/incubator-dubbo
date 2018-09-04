@@ -234,10 +234,17 @@ public /**final**/ class URL implements Serializable {
             }
             url = url.substring(i + 1);
         }
-        i = url.indexOf(":");
+        i = url.lastIndexOf(":");
         if (i >= 0 && i < url.length() - 1) {
-            port = Integer.parseInt(url.substring(i + 1));
-            url = url.substring(0, i);
+            if (url.lastIndexOf("%") > i) {
+                // ipv6 address with scope id
+                // e.g. fe80:0:0:0:894:aeec:f37d:23e1%en0
+                // see https://howdoesinternetwork.com/2013/ipv6-zone-id
+                // ignore
+            } else {
+                port = Integer.parseInt(url.substring(i+1));
+                url = url.substring(0, i);
+            }
         }
         if (url.length() > 0) host = url;
         return new URL(protocol, username, password, host, port, path, parameters);
@@ -628,6 +635,8 @@ public /**final**/ class URL implements Serializable {
         return value.charAt(0);
     }
 
+
+    //获取参数值，如果没有找到，则返回defaultValue
     public boolean getParameter(String key, boolean defaultValue) {
         String value = getParameter(key);
         if (value == null || value.length() == 0) {
@@ -864,7 +873,10 @@ public /**final**/ class URL implements Serializable {
         return NetUtils.isLocalHost(host) || getParameter(Constants.LOCALHOST_KEY, false);
     }
 
+
+    //判断属性anyhost=true，
     public boolean isAnyHost() {
+        //如果host是0.0.0.0或anyhost=true
         return Constants.ANYHOST_VALUE.equals(host) || getParameter(Constants.ANYHOST_KEY, false);
     }
 
