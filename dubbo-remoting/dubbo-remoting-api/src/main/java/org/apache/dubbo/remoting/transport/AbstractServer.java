@@ -57,6 +57,8 @@ public abstract class AbstractServer extends AbstractEndpoint implements Server 
         if (url.getParameter(Constants.ANYHOST_KEY, false) || NetUtils.isInvalidLocalHost(bindIp)) {
             bindIp = NetUtils.ANYHOST;
         }
+
+
         //绑定ip
         bindAddress = new InetSocketAddress(bindIp, bindPort);
         this.accepts = url.getParameter(Constants.ACCEPTS_KEY, Constants.DEFAULT_ACCEPTS);

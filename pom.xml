@@ -14,25 +14,33 @@
   See the License for the specific language governing permissions and
   limitations under the License.
   -->
+<!--顶级元素，声明xml name space约束-->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 
+    <!--pom版本-->
     <modelVersion>4.0.0</modelVersion>
 
+    <!--父级依赖,apache项目，distributionManagement指定为apache仓库-->
     <parent>
         <groupId>org.apache</groupId>
         <artifactId>apache</artifactId>
         <version>19</version>
     </parent>
 
+    <!--定义项目坐标和打包方式，多模块的父级pom打包模式为pom-->
     <groupId>org.apache.dubbo</groupId>
     <artifactId>dubbo-parent</artifactId>
+    <!--snapshot表示该项目处于开发阶段，版本动态更改-->
     <version>2.7.0-SNAPSHOT</version>
+    <!--多module项目的父级pom-->
     <packaging>pom</packaging>
 
     <name>${project.artifactId}</name>
     <description>The parent project of dubbo</description>
+    <!--该项目的地址-->
     <url>https://github.com/apache/incubator-dubbo</url>
     <inceptionYear>2011</inceptionYear>
+    <!--证书-->
     <licenses>
         <license>
             <name>Apache License, Version 2.0</name>
@@ -41,12 +49,15 @@
         </license>
     </licenses>
 
+    <!--源代码仓库信息-->
     <scm>
         <url>https://github.com/apache/incubator-dubbo</url>
         <connection>scm:git:https://github.com/apache/incubator-dubbo.git</connection>
         <developerConnection>scm:git:https://github.com/apache/incubator-dubbo.git</developerConnection>
         <tag>HEAD</tag>
     </scm>
+
+    <!--项目email信息-->
     <mailingLists>
         <mailingList>
             <name>Development List</name>
@@ -67,6 +78,8 @@
             <post>issues@dubbo.apache.org</post>
         </mailingList>
     </mailingLists>
+
+    <!--开发者-->
     <developers>
         <developer>
             <id>dubbo.io</id>
@@ -76,16 +89,19 @@
         </developer>
     </developers>
 
+    <!--组织-->
     <organization>
         <name>The Apache Software Foundation</name>
         <url>http://www.apache.org/</url>
     </organization>
 
+    <!--问题管理-->
     <issueManagement>
         <system>Github Issues</system>
         <url>https://github.com/apache/incubator-dubbo/issues</url>
     </issueManagement>
 
+    <!--全局属性-->
     <properties>
         <!-- Test libs -->
         <junit_version>4.12</junit_version>
@@ -125,6 +141,7 @@
         <rat.skip>true</rat.skip>
     </properties>
 
+    <!--子模块-->
     <modules>
         <module>dubbo-common</module>
         <module>dubbo-metrics</module>
@@ -147,6 +164,7 @@
         <module>dubbo-distribution</module>
     </modules>
 
+    <!--统一依赖版本管理-->
     <dependencyManagement>
         <dependencies>
             <dependency>
@@ -159,6 +177,7 @@
         </dependencies>
     </dependencyManagement>
 
+    <!--通用依赖-->
     <dependencies>
         <dependency>
             <groupId>junit</groupId>
@@ -186,6 +205,9 @@
         </dependency>
     </dependencies>
 
+    <!--场景个性化构建，主要是属性，插件，需要定义激活条件-->
+    <!--显示激活：编译时指定-P [id] 方式或配置activeByDefault进行激活-->
+    <!--自动激活：根据jdk环境等-->
     <profiles>
         <profile>
             <id>java6</id>
@@ -200,6 +222,7 @@
         </profile>
         <profile>
             <id>test</id>
+            <!--缺少.project文件下进行激活-->
             <activation>
                 <file>
                     <missing>.project</missing>
@@ -225,6 +248,7 @@
         </profile>
         <profile>
             <id>java8-vm-args</id>
+            <!--1.8环境下进行激活-->
             <activation>
                 <jdk>[1.8,)</jdk>
             </activation>
@@ -320,11 +344,14 @@
         </profile>
     </profiles>
 
+    <!--项目构建配置-->
     <build>
         <!-- Used for packaging NOTICE & LICENSE to each sub-module jar-->
+        <!--资源打包配置-->
         <resources>
             <resource>
                 <directory>src/main/resources/</directory>
+                <!--是否动态替换资源中的kv-->
                 <filtering>false</filtering>
             </resource>
             <resource>
@@ -346,6 +373,7 @@
                 </includes>
             </resource>
         </resources>
+        <!--插件配置-->
         <plugins>
             <plugin>
                 <artifactId>maven-source-plugin</artifactId>
@@ -556,6 +584,7 @@
             </plugin>
         </plugins>
 
+        <!--类似于dependencyManagement，进行统一的插件版本管理，对所有子模块有效-->
         <pluginManagement>
             <plugins>
                 <!-- keep surefire and failsafe in sync -->
