@@ -30,7 +30,7 @@ import org.apache.dubbo.rpc.support.ProtocolUtils;
 import java.util.Map;
 
 /**
- * InjvmProtocol
+ * InjvmProtocol 服务本地暴露协议
  */
 public class InjvmProtocol extends AbstractProtocol implements Protocol {
 

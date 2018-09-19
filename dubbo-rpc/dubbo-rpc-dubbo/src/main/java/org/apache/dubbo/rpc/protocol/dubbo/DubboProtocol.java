@@ -240,8 +240,10 @@ public class DubboProtocol extends AbstractProtocol {
         return DEFAULT_PORT;
     }
 
+    //使用dubbo协议暴露服务
     @Override
     public <T> Exporter<T> export(Invoker<T> invoker) throws RpcException {
+        //获取服务引用
         URL url = invoker.getUrl();
 
         // export service.

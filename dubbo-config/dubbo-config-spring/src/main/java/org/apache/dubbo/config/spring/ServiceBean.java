@@ -114,12 +114,15 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
         return service;
     }
 
+    //服务对象暴露入口，利用spring容器通知机制，容器初始化完成后开始暴露
     @Override
     public void onApplicationEvent(ContextRefreshedEvent event) {
         if (isDelay() && !isExported() && !isUnexported()) {
             if (logger.isInfoEnabled()) {
                 logger.info("The service ready on spring started. service: " + getInterface());
             }
+
+            //向上引用父类ServiceConfig的暴露方法
             export();
         }
     }
