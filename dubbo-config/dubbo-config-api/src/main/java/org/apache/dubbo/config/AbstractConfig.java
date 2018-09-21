@@ -171,8 +171,7 @@ public abstract class AbstractConfig implements Serializable {
     protected static void appendParameters(Map<String, String> parameters, Object config) {
         appendParameters(parameters, config, null);
     }
-    //拼接dubbo url: protocol://username:password@host:port/path?key=value&key=value 的参数集合paramters
-    //即 config -> parameters, 即URL.parameters
+    //将配置添加到map,这些参数最终会作为服务暴露url的参数
     @SuppressWarnings("unchecked")
     protected static void appendParameters(Map<String, String> parameters, Object config, String prefix) {
         if (config == null) {
@@ -180,6 +179,8 @@ public abstract class AbstractConfig implements Serializable {
         }
 
         //读取配置对象属性的@Parameters注解并拼接到参数集合parameters
+
+        //反射读取配置对象的所有方法，一般是对应元素属性的get方法，例如<dubbo:registry addres=xxx/> -> RegistyConfig.getAddress()
         Method[] methods = config.getClass().getMethods();
         for (Method method : methods) {
             try {

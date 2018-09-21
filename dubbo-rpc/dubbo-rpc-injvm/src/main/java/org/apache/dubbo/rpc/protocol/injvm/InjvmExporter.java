@@ -31,6 +31,7 @@ class InjvmExporter<T> extends AbstractExporter<T> {
 
     private final Map<String, Exporter<?>> exporterMap;
 
+    //发起暴露，实际上就是持有invoker并构建服务URL到exporter的映射
     InjvmExporter(Invoker<T> invoker, String key, Map<String, Exporter<?>> exporterMap) {
         super(invoker);
         this.key = key;

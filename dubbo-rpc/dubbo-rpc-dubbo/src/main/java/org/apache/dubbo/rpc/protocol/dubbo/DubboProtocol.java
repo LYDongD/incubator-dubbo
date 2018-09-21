@@ -243,10 +243,11 @@ public class DubboProtocol extends AbstractProtocol {
     //使用dubbo协议暴露服务
     @Override
     public <T> Exporter<T> export(Invoker<T> invoker) throws RpcException {
+
         //获取服务引用
         URL url = invoker.getUrl();
 
-        // export service.
+        // export service.  创建 DubboExporter 对象，并添加到 `exporterMap`（暴露的服务都要添加到这个map） 。
         String key = serviceKey(url);
         DubboExporter<T> exporter = new DubboExporter<T>(invoker, key, exporterMap);
         exporterMap.put(key, exporter);
@@ -266,49 +267,68 @@ public class DubboProtocol extends AbstractProtocol {
             }
         }
 
+        //启动通信服务器
         openServer(url);
+        //初始化序列化优化器
         optimizeSerialization(url);
         return exporter;
     }
 
+    //根据url启动通信服务，不重复启动
     private void openServer(URL url) {
         // find server.
         String key = url.getAddress();
         //client can export a service which's only for server to invoke
         boolean isServer = url.getParameter(Constants.IS_SERVER_KEY, true);
         if (isServer) {
+            //serverMap为通信服务集合, key服务器地址： host:port
             ExchangeServer server = serverMap.get(key);
+            //如果没有启动则进行启动，不重复创建通信服务
             if (server == null) {
                 synchronized (this) {
                     server = serverMap.get(key);
                     if (server == null) {
+                        //createServer 启动通信服务
                         serverMap.put(key, createServer(url));
                     }
                 }
             } else {
                 // server supports reset, use together with override
+                //通信服务已存在，重置通信服务属性
                 server.reset(url);
             }
         }
     }
 
+    //启动通信服务
     private ExchangeServer createServer(URL url) {
+
+        //默认开启: server关闭时发送 READ_ONLY 事件
         // send readonly event when server closes, it's enabled by default
         url = url.addParameterIfAbsent(Constants.CHANNEL_READONLYEVENT_SENT_KEY, Boolean.TRUE.toString());
+
+        //默认开启 heartbeat
         // enable heartbeat by default
         url = url.addParameterIfAbsent(Constants.HEARTBEAT_KEY, String.valueOf(Constants.DEFAULT_HEARTBEAT));
         String str = url.getParameter(Constants.SERVER_KEY, Constants.DEFAULT_REMOTING_SERVER);
 
+        //校验 Server 的 Dubbo SPI 拓展是否存在
         if (str != null && str.length() > 0 && !ExtensionLoader.getExtensionLoader(Transporter.class).hasExtension(str))
             throw new RpcException("Unsupported server type: " + str + ", url: " + url);
 
+        //设置编解码器为 `"Dubbo"`
         url = url.addParameter(Constants.CODEC_KEY, DubboCodec.NAME);
+
+        //启动通信服务器
         ExchangeServer server;
         try {
+            //绑定端口并指定请求处理器, handler内调用invoker
             server = Exchangers.bind(url, requestHandler);
         } catch (RemotingException e) {
             throw new RpcException("Fail to start server(url: " + url + ") " + e.getMessage(), e);
         }
+
+        // 校验 Client 的 Dubbo SPI 拓展是否存在
         str = url.getParameter(Constants.CLIENT_KEY);
         if (str != null && str.length() > 0) {
             Set<String> supportedTypes = ExtensionLoader.getExtensionLoader(Transporter.class).getSupportedExtensions();

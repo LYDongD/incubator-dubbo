@@ -366,17 +366,27 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         unexported = true;
     }
 
+
+    /*
+     *  暴露服务URL
+     */
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void doExportUrls() {
-        //注册中心(URL)列表： registry://host:port/interfaceName?application=xxx&dubbo=2.5.3&group=liam.....
+        //加载注册中心(URL)列表： registry://host:port/interfaceName?application=xxx&dubbo=2.5.3&group=liam.....
         List<URL> registryURLs = loadRegistries(true);
+        //向多个注册中心协议逐个暴露服务
         for (ProtocolConfig protocolConfig : protocols) {
-            //使用具体的协议进行暴露
+            //使用单个应用协议暴露服务(本地暴露和远程暴露，本地暴露不会注册)
             doExportUrlsFor1Protocol(protocolConfig, registryURLs);
         }
     }
 
-    //根据应用协议进行暴露，例如dubbo协议
+
+    /*
+     * 根据应用协议进行暴露，例如dubbo协议
+     * @ProtocolConfig 协议配置对象
+     * @registryURLs 注册中心URL数组
+     */
     private void doExportUrlsFor1Protocol(ProtocolConfig protocolConfig, List<URL> registryURLs) {
 
         //default dubbo as protocal
@@ -385,6 +395,7 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
             name = "dubbo";
         }
 
+        //创建服务URL
         Map<String, String> map = new HashMap<String, String>();
         map.put(Constants.SIDE_KEY, Constants.PROVIDER_SIDE);
         map.put(Constants.DUBBO_VERSION_KEY, Version.getProtocolVersion());
@@ -507,9 +518,9 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                     .getExtension(url.getProtocol()).getConfigurator(url).configure(url);
         }
 
+        //根据scope决定暴露的方式：本地暴露/远程暴露
         String scope = url.getParameter(Constants.SCOPE_KEY);
         // don't export when none is configured
-        //根据scope决定暴露的方式：本地暴露/远程暴露
         if (!Constants.SCOPE_NONE.equalsIgnoreCase(scope)) {
 
             // export to local if the config is not remote (export to remote only when config is remote)
@@ -523,15 +534,17 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                 if (logger.isInfoEnabled()) {
                     logger.info("Export dubbo service " + interfaceClass.getName() + " to url " + url);
                 }
-                //向每个注册中心注册服务暴露的地址URL
+                //服务远程暴露，可能需要向多个注册中心注册
                 if (registryURLs != null && !registryURLs.isEmpty()) {
                     for (URL registryURL : registryURLs) {
+
                         // "dynamic" ：服务是否动态注册，如果设为false，注册后将显示后disable状态，需人工启用，并且服务提供者停止时，也不会自动取消册，需人工禁用。
                         url = url.addParameterIfAbsent(Constants.DYNAMIC_KEY, registryURL.getParameter(Constants.DYNAMIC_KEY));
 
                         //获得监控中心 URL
                         URL monitorUrl = loadMonitor(registryURL);
                         if (monitorUrl != null) {
+                            //作为monitor参数添加到服务URL后
                             url = url.addParameterAndEncoded(Constants.MONITOR_KEY, monitorUrl.toFullString());
                         }
                         if (logger.isInfoEnabled()) {
@@ -547,13 +560,16 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                         //使用 ProxyFactory 创建 Invoker 对象，持有服务引用的控制权，包含服务注册URL,其中服务暴露地址作为注册URL的参数
                         // registry://registry_host:port/com.alibaba.dubbo.RegistryService?application=xxx&export=dubbo://host:port/interfaceName?xxx
                         Invoker<?> invoker = proxyFactory.getInvoker(ref, (Class) interfaceClass, registryURL.addParameterAndEncoded(Constants.EXPORT_KEY, url.toFullString()));
+
+                        //在invoker的基础上增加了ServiceConfig
                         DelegateProviderMetaDataInvoker wrapperInvoker = new DelegateProviderMetaDataInvoker(invoker, this);
 
                         //使用 Protocol 暴露 Invoker 对象， 完成服务暴露
+                        //此时的url是注册中心url, 自动识别为RegistryProtocol，在RegistryProtocol继续export服务的url
                         Exporter<?> exporter = protocol.export(wrapperInvoker);
                         exporters.add(exporter);
                     }
-                } else {
+                } else { //无注册中心，不需要注册，服务直连模式(开发环境下可采用该模式，不需要注册中心，消费者需要明确知道提供者服务的URL，无法从注册中心获取)
                     Invoker<?> invoker = proxyFactory.getInvoker(ref, (Class) interfaceClass, url);
                     DelegateProviderMetaDataInvoker wrapperInvoker = new DelegateProviderMetaDataInvoker(invoker, this);
 
@@ -565,15 +581,24 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         this.urls.add(url);
     }
 
+
+    /*
+     * 本地服务调用
+     * @param URL 服务URL
+     */
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void exportLocal(URL url) {
         if (!Constants.LOCAL_PROTOCOL.equalsIgnoreCase(url.getProtocol())) {
+            //创建本地暴露的url，协议指定为injvm, host=127.0.0.1, port=0
             URL local = URL.valueOf(url.toFullString())
                     .setProtocol(Constants.LOCAL_PROTOCOL)
                     .setHost(LOCALHOST)
                     .setPort(0);
+            //添加服务的引用类名,例如DemoServiceImpl
             ServiceClassHolder.getInstance().pushServiceClass(getServiceClass(ref));
-            //通过代理持有服务引用的控制权：invoker
+            //通过代理持有（代理工厂创建）服务引用的控制权：invoker, 调用服务即invoker.invoke(invocation),内部调用ref
+            //使用协议暴露Invoker
+            //利用dubbo spi 根据url动态创建对应扩展协议并调用 : ProtocolFilterWrapper ->
             Exporter<?> exporter = protocol.export(
                     proxyFactory.getInvoker(ref, (Class) interfaceClass, local));
             exporters.add(exporter);

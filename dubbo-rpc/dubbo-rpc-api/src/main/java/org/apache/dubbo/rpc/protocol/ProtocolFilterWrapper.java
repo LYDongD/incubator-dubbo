@@ -31,6 +31,7 @@ import java.util.List;
 
 /**
  * ListenerProtocol
+ * 装饰器模式
  */
 public class ProtocolFilterWrapper implements Protocol {
 
@@ -43,13 +44,19 @@ public class ProtocolFilterWrapper implements Protocol {
         this.protocol = protocol;
     }
 
+    //为invoker添加filter拦截器链
     private static <T> Invoker<T> buildInvokerChain(final Invoker<T> invoker, String key, String group) {
         Invoker<T> last = invoker;
+        //spi机制获取过滤器数组，根据key(配置的filter属性)， 例如<dubbo:service interface="com.alibaba.dubbo.demo.DemoService" ref="demoService" filter="demo" />
+        //配置的属性可以从url的参数(例如：servcei.filfer=demo)中获取
         List<Filter> filters = ExtensionLoader.getExtensionLoader(Filter.class).getActivateExtension(invoker.getUrl(), key, group);
+
+        //构造待filer链的invoker,倒序构造
         if (!filters.isEmpty()) {
             for (int i = filters.size() - 1; i >= 0; i--) {
                 final Filter filter = filters.get(i);
                 final Invoker<T> next = last;
+
                 last = new Invoker<T>() {
 
                     @Override
@@ -92,10 +99,13 @@ public class ProtocolFilterWrapper implements Protocol {
         return protocol.getDefaultPort();
     }
 
+    /*
+     *  装饰器模式，为协议暴露添加功能
+     */
     @Override
     public <T> Exporter<T> export(Invoker<T> invoker) throws RpcException {
 
-        // 注册中心
+        // 注册中心协议(注册协议暴露是需要完成服务注册)，无需创建调用链
         if (Constants.REGISTRY_PROTOCOL.equals(invoker.getUrl().getProtocol())) {
             return protocol.export(invoker);
         }

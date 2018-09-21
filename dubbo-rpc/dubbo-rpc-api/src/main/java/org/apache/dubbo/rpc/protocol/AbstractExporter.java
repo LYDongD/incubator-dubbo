@@ -28,6 +28,7 @@ public abstract class AbstractExporter<T> implements Exporter<T> {
 
     protected final Logger logger = LoggerFactory.getLogger(getClass());
 
+    //exporter持有invoker的控制权
     private final Invoker<T> invoker;
 
     private volatile boolean unexported = false;

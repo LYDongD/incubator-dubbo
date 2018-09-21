@@ -102,12 +102,18 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
     // the scope for referring/exporting a service, if it's local, it means searching in current JVM only.
     private String scope;
 
+    /**
+     * 校验 RegistryConfig 配置数组。
+     * 实际上，该方法会初始化 RegistryConfig 的配置属性。
+     */
     protected void checkRegistry() {
         // for backward compatibility
+        //如果RegistryConfig数组为空时，从属性dubbo.registry.address获取地址并创建配置，可在运行服务时指定
         if (registries == null || registries.isEmpty()) {
             String address = ConfigUtils.getProperty("dubbo.registry.address");
             if (address != null && address.length() > 0) {
                 registries = new ArrayList<RegistryConfig>();
+                //注册中心地址可以用"|"隔开并添加多个
                 String[] as = address.split("\\s*[|]+\\s*");
                 for (String a : as) {
                     RegistryConfig registryConfig = new RegistryConfig();
@@ -125,6 +131,7 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
                     + Version.getVersion()
                     + ", Please add <dubbo:registry address=\"...\" /> to your spring config. If you want unregister, please set <dubbo:service registry=\"N/A\" />");
         }
+        //读取环境变量和properties配置到RegistryConfig
         for (RegistryConfig registryConfig : registries) {
             appendProperties(registryConfig);
         }
@@ -158,32 +165,39 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
 
     //生成注册中心URL列表，可能具备多个注册中心
     protected List<URL> loadRegistries(boolean provider) {
-        //获取注册中心配置RegistryConfig list, 可能配置多个注册中心
+        //校验RegistryConfig数组
         checkRegistry();
+        //创建注册中心的URL数组
         List<URL> registryList = new ArrayList<URL>();
+        //可能会有多个注册中心
         if (registries != null && !registries.isEmpty()) {
             for (RegistryConfig config : registries) {
+                //获取注册中心地址
                 String address = config.getAddress();
                 if (address == null || address.length() == 0) {
                     address = Constants.ANYHOST_VALUE;
                 }
+                //从启动参数中读取,在启动dubbo服务的时候可添加该参数，动态指定的地址优先
                 String sysaddress = System.getProperty("dubbo.registry.address");
                 if (sysaddress != null && sysaddress.length() > 0) {
                     address = sysaddress;
                 }
 
+                //地址有效，注意'N/A'是无效地址
                 if (address.length() > 0 && !RegistryConfig.NO_AVAILABLE.equalsIgnoreCase(address)) {
 
-                    //构造服务URL参数
+                    //构造服务URL参数： 将各种配置对象添加到hash表
                     Map<String, String> map = new HashMap<String, String>();
                     appendParameters(map, application);
                     appendParameters(map, config);
+                    //添加path, dubbo, timestamp, pid到hash表
                     map.put("path", RegistryService.class.getName());
                     map.put("dubbo", Version.getProtocolVersion());
                     map.put(Constants.TIMESTAMP_KEY, String.valueOf(System.currentTimeMillis()));
                     if (ConfigUtils.getPid() > 0) {
                         map.put(Constants.PID_KEY, String.valueOf(ConfigUtils.getPid()));
                     }
+                    //如果没有协议protocal，则采用dubbo默认协议
                     if (!map.containsKey("protocol")) {
                         if (ExtensionLoader.getExtensionLoader(RegistryFactory.class).hasExtension("remote")) {
                             map.put("protocol", "remote");
@@ -192,11 +206,13 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
                         }
                     }
 
-                    //生成服务URL，并添加到待注册列表中
+                    //生成服务URL数组
                     List<URL> urls = UrlUtils.parseURLs(address, map);
                     for (URL url : urls) {
+                        //为url设置registry和protocol属性
                         url = url.addParameter(Constants.REGISTRY_KEY, url.getProtocol());
                         url = url.setProtocol(Constants.REGISTRY_PROTOCOL);
+                        //添加到结果数组，需要注册的提供者和需要订阅的消费者将会被添加到注册URL中
                         if ((provider && url.getParameter(Constants.REGISTER_KEY, true))
                                 || (!provider && url.getParameter(Constants.SUBSCRIBE_KEY, true))) {
                             registryList.add(url);

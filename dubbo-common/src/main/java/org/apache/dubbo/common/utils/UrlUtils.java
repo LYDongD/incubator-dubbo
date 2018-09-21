@@ -32,6 +32,8 @@ public class UrlUtils {
      */
     private final static String URL_PARAM_STARTING_SYMBOL = "?";
 
+
+    //解析URL，将defults内的参数添加到address后
     public static URL parseURL(String address, Map<String, String> defaults) {
         if (address == null || address.length() == 0) {
             return null;
@@ -129,6 +131,9 @@ public class UrlUtils {
         return u;
     }
 
+    /*
+     *  解析地址和参数，生成URL
+     */
     public static List<URL> parseURLs(String address, Map<String, String> defaults) {
         if (address == null || address.length() == 0) {
             return null;
