@@ -114,7 +114,7 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
         return service;
     }
 
-    //服务对象暴露入口，利用spring容器通知机制，容器初始化完成后开始暴露
+    //delay=null 或 delay=-1时，等待容器完全初始化后暴露
     @Override
     public void onApplicationEvent(ContextRefreshedEvent event) {
         if (isDelay() && !isExported() && !isUnexported()) {
@@ -127,15 +127,21 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
         }
     }
 
+    //是否完全delay，即等到容器完全初始化成功后才进行暴露
     private boolean isDelay() {
         Integer delay = getDelay();
+
+        //provider的delay属性优先
         ProviderConfig provider = getProvider();
         if (delay == null && provider != null) {
             delay = provider.getDelay();
         }
+
+        //用一个状态boolean来控制行为开关，该boolean被声明为transient
         return supportedApplicationListener && (delay == null || delay == -1);
     }
 
+    //service bean初始化完成后置逻辑，如果不是完全delay，则在这里进行暴露
     @Override
     @SuppressWarnings({"unchecked", "deprecation"})
     public void afterPropertiesSet() throws Exception {

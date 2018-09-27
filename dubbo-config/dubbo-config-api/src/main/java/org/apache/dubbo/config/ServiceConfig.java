@@ -194,14 +194,20 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
 
     //服务暴露，该方法是同步方法，意味着无法同时暴露一个bean
     public synchronized void export() {
+
+        //优先从provider获取暴露属性
         if (provider != null) {
             if (export == null) {
                 export = provider.getExport();
             }
+
+            //获取延迟属性
             if (delay == null) {
                 delay = provider.getDelay();
             }
         }
+
+        //export为false则不想进行暴露
         if (export != null && !export) {
             return;
         }
@@ -367,9 +373,6 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
     }
 
 
-    /*
-     *  暴露服务URL
-     */
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void doExportUrls() {
         //加载注册中心(URL)列表： registry://host:port/interfaceName?application=xxx&dubbo=2.5.3&group=liam.....
