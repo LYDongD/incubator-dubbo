@@ -33,6 +33,15 @@ public class RandomLoadBalance extends AbstractLoadBalance {
 
     private final Random random = new Random();
 
+    /*
+     *  随机策略算法
+     *
+     *  1 如果权重一致，索引为1-length直接的随机数(平均随机)
+     *  2 如果权重不一致，则计算总权重，不同索引的权重偏移量不同
+     *  3 基于总权重生成随机数，根据随机数在总权重的偏移量来计算索引
+     *  4 偏移量递减算法确定偏移所在索引(偏移<0时，落在该索引)
+     *
+     */
     @Override
     protected <T> Invoker<T> doSelect(List<Invoker<T>> invokers, URL url, Invocation invocation) {
         int length = invokers.size(); // Number of invokers
@@ -46,6 +55,7 @@ public class RandomLoadBalance extends AbstractLoadBalance {
                 sameWeight = false;
             }
         }
+
         if (totalWeight > 0 && !sameWeight) {
             // If (not every invoker has the same weight & at least one invoker's weight>0), select randomly based on totalWeight.
             int offset = random.nextInt(totalWeight);

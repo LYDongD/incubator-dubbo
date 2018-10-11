@@ -43,6 +43,7 @@ public class RoundRobinLoadBalance extends AbstractLoadBalance {
         int length = invokers.size(); // Number of invokers
         int maxWeight = 0; // The maximum weight
         int minWeight = Integer.MAX_VALUE; // The minimum weight
+        //节点->权重 hash表
         final LinkedHashMap<Invoker<T>, IntegerWrapper> invokerToWeightMap = new LinkedHashMap<Invoker<T>, IntegerWrapper>();
         int weightSum = 0;
         for (int i = 0; i < length; i++) {
@@ -54,15 +55,24 @@ public class RoundRobinLoadBalance extends AbstractLoadBalance {
                 weightSum += weight;
             }
         }
+
+        //CAS自增序列号， 为每一个方法维护一个序列号，每次方法调用，方法的序列号就自增一次，轮询下一个节点
         AtomicPositiveInteger sequence = sequences.get(key);
         if (sequence == null) {
             sequences.putIfAbsent(key, new AtomicPositiveInteger());
             sequence = sequences.get(key);
         }
+
+        //每次方法调用，序列号+1
         int currentSequence = sequence.getAndIncrement();
+
+        //根据权重分配
         if (maxWeight > 0 && minWeight < maxWeight) {
             int mod = currentSequence % weightSum;
+
+            //至多遍历maxWeight轮，每遍历一轮，节点权重-1
             for (int i = 0; i < maxWeight; i++) {
+                //每轮遍历所有节点，当mod = 0 时，如果节点仍然有权重，则选择该节点
                 for (Map.Entry<Invoker<T>, IntegerWrapper> each : invokerToWeightMap.entrySet()) {
                     final Invoker<T> k = each.getKey();
                     final IntegerWrapper v = each.getValue();
@@ -76,7 +86,8 @@ public class RoundRobinLoadBalance extends AbstractLoadBalance {
                 }
             }
         }
-        // Round robin
+
+        // Round robin 平均顺序获取：序列号求模
         return invokers.get(currentSequence % length);
     }
 
