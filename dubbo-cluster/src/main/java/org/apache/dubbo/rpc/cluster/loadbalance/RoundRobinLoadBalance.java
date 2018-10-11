@@ -37,6 +37,15 @@ public class RoundRobinLoadBalance extends AbstractLoadBalance {
 
     private final ConcurrentMap<String, AtomicPositiveInteger> indexSeqs = new ConcurrentHashMap<String, AtomicPositiveInteger>();
 
+    /*
+     *  加权轮询算法
+     *
+     *  1 依次遍历所有可用的节点，选择比权限基准线大的节点
+     *  2 每完成一轮迭代，在最大权重内不断提升权重基准线
+     *  3 随着迭代次数增加，权重基准线不断抬高，只有权重高的节点会被选择
+     *  4 到达最大权重后，重新执行上述过程
+     *
+     */
     @Override
     protected <T> Invoker<T> doSelect(List<Invoker<T>> invokers, URL url, Invocation invocation) {
         String key = invokers.get(0).getUrl().getServiceKey() + "." + invocation.getMethodName();
@@ -44,6 +53,7 @@ public class RoundRobinLoadBalance extends AbstractLoadBalance {
         int maxWeight = 0; // The maximum weight
         int minWeight = Integer.MAX_VALUE; // The minimum weight
 
+        //加权轮询时，仅轮询权重>0的节点
         final List<Invoker<T>> nonZeroWeightedInvokers = new ArrayList<>();
 
         for (int i = 0; i < length; i++) {
@@ -63,20 +73,27 @@ public class RoundRobinLoadBalance extends AbstractLoadBalance {
         }
 
         if (maxWeight > 0 && minWeight < maxWeight) {
+
             AtomicPositiveInteger indexSeq = indexSeqs.get(key);
             if (indexSeq == null) {
                 indexSeqs.putIfAbsent(key, new AtomicPositiveInteger(-1));
                 indexSeq = indexSeqs.get(key);
             }
             length = nonZeroWeightedInvokers.size();
+
+            //每迭代一轮更新一次当前权重(权重基准)，一轮内比当前权重大的节点可被选择
+            //在一个maxWeight周期内，随着迭代轮增加，权重基准也抬高，只有高权重的节点会被选择
             while (true) {
+                //迭代每个节点
                 int index = indexSeq.incrementAndGet() % length;
                 int currentWeight;
-                if (index == 0) {
+                if (index == 0) { //每迭代一轮更新一次当前权重，比当前权重大的节点可被选择
                     currentWeight = sequence.incrementAndGet() % maxWeight;
                 } else {
                     currentWeight = sequence.get() % maxWeight;
                 }
+
+
                 if (getWeight(nonZeroWeightedInvokers.get(index), invocation) > currentWeight) {
                     return nonZeroWeightedInvokers.get(index);
                 }
