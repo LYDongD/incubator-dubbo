@@ -72,6 +72,7 @@ public class RoundRobinLoadBalance extends AbstractLoadBalance {
             sequence = sequences.get(key);
         }
 
+        //加权轮询
         if (maxWeight > 0 && minWeight < maxWeight) {
 
             AtomicPositiveInteger indexSeq = indexSeqs.get(key);
@@ -99,7 +100,8 @@ public class RoundRobinLoadBalance extends AbstractLoadBalance {
                 }
             }
         }
-        // Round robin
+
+        // Round robin平均轮询
         return invokers.get(sequence.getAndIncrement() % length);
     }
 }
