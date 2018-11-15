@@ -30,11 +30,14 @@ import java.util.List;
  */
 public abstract class AbstractLoadBalance implements LoadBalance {
 
+
+    //权重稀释算法：实际权重 = (启动时间 / 预热时间) * 配置权重
     static int calculateWarmupWeight(int uptime, int warmup, int weight) {
         int ww = (int) ((float) uptime / ((float) warmup / (float) weight));
         return ww < 1 ? 1 : (ww > weight ? weight : ww);
     }
 
+    //模板方法，封装接口扩展的通用操作
     @Override
     public <T> Invoker<T> select(List<Invoker<T>> invokers, URL url, Invocation invocation) {
         if (invokers == null || invokers.isEmpty()) {
@@ -48,13 +51,26 @@ public abstract class AbstractLoadBalance implements LoadBalance {
 
     protected abstract <T> Invoker<T> doSelect(List<Invoker<T>> invokers, URL url, Invocation invocation);
 
+    /*
+     *  获取节点的权重
+     *
+     *  1 从配置中获取，否则取默认值100
+     *  2 考虑jvm的预热机制，对刚启动的节点降低权重
+     *  3 权重稀释比例为 启动时间 / 预热时间
+     *  4 启动时间越长，稀释比例越低
+     *  5 预热时间可配置，默认为10min
+     *
+     */
     protected int getWeight(Invoker<?> invoker, Invocation invocation) {
         int weight = invoker.getUrl().getMethodParameter(invocation.getMethodName(), Constants.WEIGHT_KEY, Constants.DEFAULT_WEIGHT);
         if (weight > 0) {
             long timestamp = invoker.getUrl().getParameter(Constants.REMOTE_TIMESTAMP_KEY, 0L);
             if (timestamp > 0L) {
+                //计算启动时间
                 int uptime = (int) (System.currentTimeMillis() - timestamp);
+                //获取预热时间
                 int warmup = invoker.getUrl().getParameter(Constants.WARMUP_KEY, Constants.DEFAULT_WARMUP);
+                //启动时间在预热时间内，则稀释权重
                 if (uptime > 0 && uptime < warmup) {
                     weight = calculateWarmupWeight(uptime, warmup, weight);
                 }

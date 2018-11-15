@@ -38,6 +38,7 @@ public class NettyServer extends BaseRestServer {
     @Override
     protected void doStart(URL url) {
         String bindIp = url.getParameter(Constants.BIND_IP_KEY, url.getHost());
+        //只有参数anyhost!=true，且bindIp为有效ip，才设置hostName
         if (!url.isAnyHost() && NetUtils.isValidLocalHost(bindIp)) {
             server.setHostname(bindIp);
         }

@@ -31,9 +31,10 @@ import java.util.List;
  * <p>
  * <a href="http://en.wikipedia.org/wiki/Load_balancing_(computing)">Load-Balancing</a>
  *
+ *
  * @see org.apache.dubbo.rpc.cluster.Cluster#join(Directory)
  */
-@SPI(RandomLoadBalance.NAME)
+@SPI(RandomLoadBalance.NAME) //负载均衡器为spi扩展点，默认扩展为随机策略
 public interface LoadBalance {
 
     /**
@@ -44,7 +45,7 @@ public interface LoadBalance {
      * @param invocation invocation.
      * @return selected invoker.
      */
-    @Adaptive("loadbalance")
+    @Adaptive("loadbalance") //spi自适应：动态(运行时)创建扩展点的自适应类，自适应类再根据URL参数创建特定的实现类
     <T> Invoker<T> select(List<Invoker<T>> invokers, URL url, Invocation invocation) throws RpcException;
 
 }

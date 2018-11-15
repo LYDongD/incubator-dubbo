@@ -63,6 +63,7 @@ public class RoundRobinLoadBalance extends AbstractLoadBalance {
         }
     }
 
+
     private ConcurrentMap<String, ConcurrentMap<String, WeightedRoundRobin>> methodWeightMap = new ConcurrentHashMap<String, ConcurrentMap<String, WeightedRoundRobin>>();
     private AtomicBoolean updateLock = new AtomicBoolean();
     
@@ -148,6 +149,7 @@ public class RoundRobinLoadBalance extends AbstractLoadBalance {
         }
         // should not happen here
         return invokers.get(0);
+
     }
 
 }

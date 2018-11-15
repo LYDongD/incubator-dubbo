@@ -116,6 +116,11 @@ public class NetUtils {
         return "0.0.0.0".equals(host);
     }
 
+
+    /**
+     * 判断host是否为无效的host
+     * 空或本地host均为无效的host
+     */
     public static boolean isInvalidLocalHost(String host) {
         return host == null
                 || host.length() == 0

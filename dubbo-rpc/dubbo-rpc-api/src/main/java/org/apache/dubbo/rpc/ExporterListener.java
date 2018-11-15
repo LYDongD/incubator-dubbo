@@ -20,6 +20,7 @@ import org.apache.dubbo.common.extension.SPI;
 
 /**
  * ExporterListener. (SPI, Singleton, ThreadSafe)
+ * 监听服务暴露和解除暴露
  */
 @SPI
 public interface ExporterListener {

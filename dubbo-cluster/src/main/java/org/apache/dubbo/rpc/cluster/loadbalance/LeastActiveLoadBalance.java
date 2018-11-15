@@ -36,12 +36,15 @@ public class LeastActiveLoadBalance extends AbstractLoadBalance {
         int length = invokers.size(); // Number of invokers
         int leastActive = -1; // The least active value of all invokers
         int leastCount = 0; // The number of invokers having the same least active value (leastActive)
+        //保存目标索引，1 指向所有最小连接节点
         int[] leastIndexes = new int[length]; // The index of invokers having the same least active value (leastActive)
         int totalWeight = 0; // The sum of with warmup weights
         int firstWeight = 0; // Initial value, used for comparision
         boolean sameWeight = true; // Every invoker has the same weight value?
         for (int i = 0; i < length; i++) {
             Invoker<T> invoker = invokers.get(i);
+
+            //更新leastAcitve
             int active = RpcStatus.getStatus(invoker.getUrl(), invocation.getMethodName()).getActive(); // Active number
             int afterWarmup = getWeight(invoker, invocation);
             if (leastActive == -1 || active < leastActive) { // Restart, when find a invoker having smaller least active value.
@@ -61,11 +64,15 @@ public class LeastActiveLoadBalance extends AbstractLoadBalance {
                 }
             }
         }
+
         // assert(leastCount > 0)
         if (leastCount == 1) {
             // If we got exactly one invoker having the least active value, return this invoker directly.
             return invokers.get(leastIndexes[0]);
         }
+
+
+        //存在多个最小连接节点的情况下，根据权重(预热之后的权重)选择：总权重内随机偏移量递减法
         if (!sameWeight && totalWeight > 0) {
             // If (not every invoker has the same weight & at least one invoker's weight>0), select randomly based on totalWeight.
             int offsetWeight = ThreadLocalRandom.current().nextInt(totalWeight) + 1;

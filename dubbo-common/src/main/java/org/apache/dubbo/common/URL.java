@@ -641,6 +641,8 @@ public /**final**/ class URL implements Serializable {
         return value.charAt(0);
     }
 
+
+    //获取参数值，如果没有找到，则返回defaultValue
     public boolean getParameter(String key, boolean defaultValue) {
         String value = getParameter(key);
         if (value == null || value.length() == 0) {
@@ -877,7 +879,10 @@ public /**final**/ class URL implements Serializable {
         return NetUtils.isLocalHost(host) || getParameter(Constants.LOCALHOST_KEY, false);
     }
 
+
+    //判断属性anyhost=true，
     public boolean isAnyHost() {
+        //如果host是0.0.0.0或anyhost=true
         return Constants.ANYHOST_VALUE.equals(host) || getParameter(Constants.ANYHOST_KEY, false);
     }
 

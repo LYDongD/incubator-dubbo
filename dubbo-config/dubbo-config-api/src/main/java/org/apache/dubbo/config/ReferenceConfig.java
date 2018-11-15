@@ -304,12 +304,15 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
         ApplicationModel.initConsumerModel(getUniqueServiceName(), consumerModel);
     }
 
+    //1 invoke after init 2 create service proxy according to the config items）
     @SuppressWarnings({"unchecked", "rawtypes", "deprecation"})
     private T createProxy(Map<String, String> map) {
+
+        //distinguish local and remote reference
         URL tmpUrl = new URL("temp", "localhost", 0, map);
         final boolean isJvmRefer;
         if (isInjvm() == null) {
-            if (url != null && url.length() > 0) { // if a url is specified, don't do local reference
+            if (url != null && url.length() > 0) { // if a url is specified, don't do local reference, peer-to-peer(直连模式)
                 isJvmRefer = false;
             } else {
                 // by default, reference local service if there is
@@ -319,8 +322,10 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
             isJvmRefer = isInjvm();
         }
 
+        //create reference
         if (isJvmRefer) {
             URL url = new URL(Constants.LOCAL_PROTOCOL, NetUtils.LOCALHOST, 0, interfaceClass.getName()).addParameters(map);
+            //adaptive refer: protocal chain invoke according to url
             invoker = refprotocol.refer(interfaceClass, url);
             if (logger.isInfoEnabled()) {
                 logger.info("Using injvm service " + interfaceClass.getName());
@@ -357,9 +362,9 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                 }
             }
 
-            if (urls.size() == 1) {
+            if (urls.size() == 1) { //single register center
                 invoker = refprotocol.refer(interfaceClass, urls.get(0));
-            } else {
+            } else { //multi register center
                 List<Invoker<?>> invokers = new ArrayList<Invoker<?>>();
                 URL registryURL = null;
                 for (URL url : urls) {
@@ -378,6 +383,8 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
             }
         }
 
+        //check if reference service exist when applicaiton setup
+        //set check = false to close this check process
         Boolean c = check;
         if (c == null && consumer != null) {
             c = consumer.isCheck();
@@ -393,6 +400,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
         if (logger.isInfoEnabled()) {
             logger.info("Refer dubbo service " + interfaceClass.getName() + " from url " + invoker.getUrl());
         }
+
         // create service proxy
         return (T) proxyFactory.getProxy(invoker);
     }

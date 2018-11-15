@@ -16,16 +16,11 @@
  */
 package org.apache.dubbo.config.spring;
 
-import org.apache.dubbo.config.ApplicationConfig;
-import org.apache.dubbo.config.ModuleConfig;
-import org.apache.dubbo.config.MonitorConfig;
-import org.apache.dubbo.config.ProtocolConfig;
-import org.apache.dubbo.config.ProviderConfig;
-import org.apache.dubbo.config.RegistryConfig;
-import org.apache.dubbo.config.ServiceConfig;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.config.*;
 import org.apache.dubbo.config.annotation.Service;
 import org.apache.dubbo.config.spring.extension.SpringExtensionFactory;
-
 import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.factory.BeanFactoryUtils;
 import org.springframework.beans.factory.BeanNameAware;
@@ -42,6 +37,7 @@ import java.util.Map;
 
 import static org.apache.dubbo.config.spring.util.BeanFactoryUtils.addApplicationListener;
 
+
 /**
  * ServiceFactoryBean
  *
@@ -50,6 +46,8 @@ import static org.apache.dubbo.config.spring.util.BeanFactoryUtils.addApplicatio
 public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean, DisposableBean, ApplicationContextAware, ApplicationListener<ContextRefreshedEvent>, BeanNameAware {
 
     private static final long serialVersionUID = 213195494150089726L;
+
+    protected static final Logger logger = LoggerFactory.getLogger(ServiceBean.class);
 
     private final transient Service service;
 
@@ -90,16 +88,21 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
         return service;
     }
 
+    //delay=null 或 delay=-1时，等待容器完全初始化后暴露
     @Override
     public void onApplicationEvent(ContextRefreshedEvent event) {
         if (!isExported() && !isUnexported()) {
             if (logger.isInfoEnabled()) {
                 logger.info("The service ready on spring started. service: " + getInterface());
             }
+
+            //向上引用父类ServiceConfig的暴露方法
             export();
         }
     }
 
+
+    //service bean初始化完成后置逻辑，如果不是完全delay，则在这里进行暴露
     @Override
     @SuppressWarnings({"unchecked", "deprecation"})
     public void afterPropertiesSet() throws Exception {
