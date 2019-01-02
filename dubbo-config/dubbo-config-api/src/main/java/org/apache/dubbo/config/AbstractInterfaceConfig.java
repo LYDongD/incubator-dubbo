@@ -19,27 +19,35 @@ package org.apache.dubbo.config;
 import org.apache.dubbo.common.Constants;
 import org.apache.dubbo.common.URL;
 import org.apache.dubbo.common.Version;
-import org.apache.dubbo.common.extension.ExtensionLoader;
+import org.apache.dubbo.common.config.Environment;
+import org.apache.dubbo.common.utils.Assert;
 import org.apache.dubbo.common.utils.ConfigUtils;
 import org.apache.dubbo.common.utils.NetUtils;
 import org.apache.dubbo.common.utils.ReflectUtils;
 import org.apache.dubbo.common.utils.StringUtils;
 import org.apache.dubbo.common.utils.UrlUtils;
 import org.apache.dubbo.config.support.Parameter;
+import org.apache.dubbo.metadata.integration.MetadataReportService;
 import org.apache.dubbo.monitor.MonitorFactory;
 import org.apache.dubbo.monitor.MonitorService;
-import org.apache.dubbo.registry.RegistryFactory;
 import org.apache.dubbo.registry.RegistryService;
 import org.apache.dubbo.rpc.Filter;
 import org.apache.dubbo.rpc.InvokerListener;
 import org.apache.dubbo.rpc.ProxyFactory;
 import org.apache.dubbo.rpc.cluster.Cluster;
+import org.apache.dubbo.rpc.model.ApplicationModel;
 import org.apache.dubbo.rpc.support.MockInvoker;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+
+import static org.apache.dubbo.common.Constants.APPLICATION_KEY;
+import static org.apache.dubbo.common.extension.ExtensionLoader.getExtensionLoader;
 
 /**
  * AbstractDefaultConfig
@@ -50,108 +58,132 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
 
     private static final long serialVersionUID = -1559314110797223229L;
 
-    // local impl class name for the service interface
+    /**
+     * Local impl class name for the service interface
+     */
     protected String local;
 
-    // local stub class name for the service interface
+    /**
+     * Local stub class name for the service interface
+     */
     protected String stub;
 
-    // service monitor
+    /**
+     * Service monitor
+     */
     protected MonitorConfig monitor;
 
-    // proxy type
+    /**
+     * Strategies for generating dynamic agents，there are two strategies can be choosed: jdk and javassist
+     */
     protected String proxy;
 
-    // cluster type
+    /**
+     * Cluster type
+     */
     protected String cluster;
 
-    // filter
+    /**
+     * The {@link Filter} when the provicer side exposed a service or the customer side references a remote service used,
+     * if there are more than one, you can use commas to separate them
+     */
     protected String filter;
 
-    // listener
+    /**
+     * The Listener when the provider side exposes a service or the customer side references a remote service used
+     * if there are more than one, you can use commas to separate them
+     */
     protected String listener;
 
-    // owner
+    /**
+     * The owner of zhe service providers
+     */
     protected String owner;
 
-    // connection limits, 0 means shared connection, otherwise it defines the connections delegated to the
-    // current service
+    /**
+     * Connection limits, 0 means shared connection, otherwise it defines the connections delegated to the current service
+     */
     protected Integer connections;
 
-    // layer
+    /**
+     * The layer of service providers
+     */
     protected String layer;
 
-    // application info
+    /**
+     * The application info
+     */
     protected ApplicationConfig application;
 
-    // module info
+    /**
+     * The module info
+     */
     protected ModuleConfig module;
 
-    // registry centers
+    /**
+     * Registry centers
+     */
     protected List<RegistryConfig> registries;
+
+    protected String registryIds;
 
     // connection events
     protected String onconnect;
 
-    // disconnection events
+    /**
+     * Disconnection events
+     */
     protected String ondisconnect;
-
+    protected MetadataReportConfig metadataReportConfig;
+    protected RegistryDataConfig registryDataConfig;
     // callback limits
     private Integer callbacks;
-
     // the scope for referring/exporting a service, if it's local, it means searching in current JVM only.
     private String scope;
 
     /**
-     * 校验 RegistryConfig 配置数组。
-     * 实际上，该方法会初始化 RegistryConfig 的配置属性。
+     * Check whether the registry config is exists, and then conversion it to {@link RegistryConfig}
      */
     protected void checkRegistry() {
-        // for backward compatibility
-        //如果RegistryConfig数组为空时，从属性dubbo.registry.address获取地址并创建配置，可在运行服务时指定
-        if (registries == null || registries.isEmpty()) {
-            String address = ConfigUtils.getProperty("dubbo.registry.address");
-            if (address != null && address.length() > 0) {
-                registries = new ArrayList<RegistryConfig>();
-                //注册中心地址可以用"|"隔开并添加多个
-                String[] as = address.split("\\s*[|]+\\s*");
-                for (String a : as) {
-                    RegistryConfig registryConfig = new RegistryConfig();
-                    registryConfig.setAddress(a);
-                    registries.add(registryConfig);
-                }
+        loadRegistriesFromBackwardConfig();
+
+        convertRegistryIdsToRegistries();
+
+        for (RegistryConfig registryConfig : registries) {
+            registryConfig.refresh();
+            if (StringUtils.isNotEmpty(registryConfig.getId())) {
+                registryConfig.setPrefix(Constants.REGISTRIES_SUFFIX);
+                registryConfig.refresh();
             }
         }
-        if ((registries == null || registries.isEmpty())) {
-            throw new IllegalStateException((getClass().getSimpleName().startsWith("Reference")
-                    ? "No such any registry to refer service in consumer "
-                    : "No such any registry to export service in provider ")
-                    + NetUtils.getLocalHost()
-                    + " use dubbo version "
-                    + Version.getVersion()
-                    + ", Please add <dubbo:registry address=\"...\" /> to your spring config. If you want unregister, please set <dubbo:service registry=\"N/A\" />");
-        }
-        //读取环境变量和properties配置到RegistryConfig
+
         for (RegistryConfig registryConfig : registries) {
-            appendProperties(registryConfig);
+            if (!registryConfig.isValid()) {
+                throw new IllegalStateException("No registry config found or it's not a valid config! " +
+                        "The registry config is: " + registryConfig);
+            }
         }
+
+        useRegistryForConfigIfNecessary();
     }
 
     @SuppressWarnings("deprecation")
     protected void checkApplication() {
         // for backward compatibility
         if (application == null) {
-            String applicationName = ConfigUtils.getProperty("dubbo.application.name");
-            if (applicationName != null && applicationName.length() > 0) {
-                application = new ApplicationConfig();
-            }
+            application = new ApplicationConfig();
         }
-        if (application == null) {
-            throw new IllegalStateException(
-                    "No such application config! Please add <dubbo:application name=\"...\" /> to your spring config.");
-        }
-        appendProperties(application);
 
+        application.refresh();
+
+        if (!application.isValid()) {
+            throw new IllegalStateException("No application config found or it's not a valid config! " +
+                    "Please add <dubbo:application name=\"...\" /> to your spring config.");
+        }
+
+        ApplicationModel.setApplication(application.getName());
+
+        // backward compatibility
         String wait = ConfigUtils.getProperty(Constants.SHUTDOWN_WAIT_KEY);
         if (wait != null && wait.trim().length() > 0) {
             System.setProperty(Constants.SHUTDOWN_WAIT_KEY, wait.trim());
@@ -163,56 +195,84 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
         }
     }
 
-    //生成注册中心URL列表，可能具备多个注册中心
+    protected void checkMonitor() {
+        if (monitor == null) {
+            monitor = new MonitorConfig();
+        }
+
+        monitor.refresh();
+
+        if (!monitor.isValid()) {
+            logger.info("There's no valid monitor config found, if you want to open monitor statistics for Dubbo, " +
+                    "please make sure your monitor is configured properly.");
+        }
+    }
+
+    protected void checkMetadataReport() {
+        if (metadataReportConfig == null) {
+            metadataReportConfig = new MetadataReportConfig();
+        }
+        metadataReportConfig.refresh();
+        if (!metadataReportConfig.isValid()) {
+            logger.warn("There's no valid metadata config found, if you are using the simplified mode of registry url, " +
+                    "please make sure you have a metadata address configured properly.");
+        }
+    }
+
+    protected void checkRegistryDataConfig() {
+        if (registryDataConfig == null) {
+            registryDataConfig = new RegistryDataConfig();
+        }
+        registryDataConfig.refresh();
+        if (!registryDataConfig.isValid()) {
+            logger.info("There's no valid registryData config found. So the registry will store full url parameter " +
+                    "to registry server.");
+        }
+    }
+
+    /**
+     *
+     * Load the registry and conversion it to {@link URL}, the priority order is: system property > dubbo registry config
+     *
+     * @param provider whether it is the provider side
+     * @return
+     */
     protected List<URL> loadRegistries(boolean provider) {
-        //校验RegistryConfig数组
+        // check && override if necessary
         checkRegistry();
-        //创建注册中心的URL数组
+        checkRegistryDataConfig();
         List<URL> registryList = new ArrayList<URL>();
         //可能会有多个注册中心
         if (registries != null && !registries.isEmpty()) {
+            Map<String, String> registryDataConfigurationMap = new HashMap<>(4);
+            appendParameters(registryDataConfigurationMap, registryDataConfig);
             for (RegistryConfig config : registries) {
                 //获取注册中心地址
                 String address = config.getAddress();
-                if (address == null || address.length() == 0) {
+                if (StringUtils.isEmpty(address)) {
                     address = Constants.ANYHOST_VALUE;
                 }
-                //从启动参数中读取,在启动dubbo服务的时候可添加该参数，动态指定的地址优先
-                String sysaddress = System.getProperty("dubbo.registry.address");
-                if (sysaddress != null && sysaddress.length() > 0) {
-                    address = sysaddress;
-                }
-
-                //地址有效，注意'N/A'是无效地址
-                if (address.length() > 0 && !RegistryConfig.NO_AVAILABLE.equalsIgnoreCase(address)) {
-
-                    //构造服务URL参数： 将各种配置对象添加到hash表
+                if (!RegistryConfig.NO_AVAILABLE.equalsIgnoreCase(address)) {
                     Map<String, String> map = new HashMap<String, String>();
                     appendParameters(map, application);
                     appendParameters(map, config);
                     //添加path, dubbo, timestamp, pid到hash表
                     map.put("path", RegistryService.class.getName());
-                    map.put("dubbo", Version.getProtocolVersion());
-                    map.put(Constants.TIMESTAMP_KEY, String.valueOf(System.currentTimeMillis()));
-                    if (ConfigUtils.getPid() > 0) {
-                        map.put(Constants.PID_KEY, String.valueOf(ConfigUtils.getPid()));
-                    }
-                    //如果没有协议protocal，则采用dubbo默认协议
+                    appendRuntimeParameters(map);
                     if (!map.containsKey("protocol")) {
-                        if (ExtensionLoader.getExtensionLoader(RegistryFactory.class).hasExtension("remote")) {
-                            map.put("protocol", "remote");
-                        } else {
-                            map.put("protocol", "dubbo");
-                        }
+                        map.put("protocol", "dubbo");
                     }
 
                     //生成服务URL数组
                     List<URL> urls = UrlUtils.parseURLs(address, map);
+
                     for (URL url : urls) {
                         //为url设置registry和protocol属性
                         url = url.addParameter(Constants.REGISTRY_KEY, url.getProtocol());
                         url = url.setProtocol(Constants.REGISTRY_PROTOCOL);
                         //添加到结果数组，需要注册的提供者和需要订阅的消费者将会被添加到注册URL中
+                        // add parameter
+                        url = url.addParametersIfAbsent(registryDataConfigurationMap);
                         if ((provider && url.getParameter(Constants.REGISTER_KEY, true))
                                 || (!provider && url.getParameter(Constants.SUBSCRIBE_KEY, true))) {
                             registryList.add(url);
@@ -224,36 +284,25 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
         return registryList;
     }
 
+    /**
+     *
+     * Load the monitor config from the system properties and conversation it to {@link URL}
+     *
+     * @param registryURL
+     * @return
+     */
     protected URL loadMonitor(URL registryURL) {
-        if (monitor == null) {
-            String monitorAddress = ConfigUtils.getProperty("dubbo.monitor.address");
-            String monitorProtocol = ConfigUtils.getProperty("dubbo.monitor.protocol");
-            if ((monitorAddress == null || monitorAddress.length() == 0) && (monitorProtocol == null || monitorProtocol.length() == 0)) {
-                return null;
-            }
-
-            monitor = new MonitorConfig();
-            if (monitorAddress != null && monitorAddress.length() > 0) {
-                monitor.setAddress(monitorAddress);
-            }
-            if (monitorProtocol != null && monitorProtocol.length() > 0) {
-                monitor.setProtocol(monitorProtocol);
-            }
-        }
-        appendProperties(monitor);
+        checkMonitor();
         Map<String, String> map = new HashMap<String, String>();
         map.put(Constants.INTERFACE_KEY, MonitorService.class.getName());
-        map.put("dubbo", Version.getProtocolVersion());
-        map.put(Constants.TIMESTAMP_KEY, String.valueOf(System.currentTimeMillis()));
-        if (ConfigUtils.getPid() > 0) {
-            map.put(Constants.PID_KEY, String.valueOf(ConfigUtils.getPid()));
-        }
+        appendRuntimeParameters(map);
         //set ip
         String hostToRegistry = ConfigUtils.getSystemProperty(Constants.DUBBO_IP_TO_REGISTRY);
         if (hostToRegistry == null || hostToRegistry.length() == 0) {
             hostToRegistry = NetUtils.getLocalHost();
         } else if (NetUtils.isInvalidLocalHost(hostToRegistry)) {
-            throw new IllegalArgumentException("Specified invalid registry ip from property:" + Constants.DUBBO_IP_TO_REGISTRY + ", value:" + hostToRegistry);
+            throw new IllegalArgumentException("Specified invalid registry ip from property:" +
+                    Constants.DUBBO_IP_TO_REGISTRY + ", value:" + hostToRegistry);
         }
         map.put(Constants.REGISTER_IP_KEY, hostToRegistry);
         appendParameters(map, monitor);
@@ -265,42 +314,79 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
         }
         if (ConfigUtils.isNotEmpty(address)) {
             if (!map.containsKey(Constants.PROTOCOL_KEY)) {
-                if (ExtensionLoader.getExtensionLoader(MonitorFactory.class).hasExtension("logstat")) {
+                if (getExtensionLoader(MonitorFactory.class).hasExtension("logstat")) {
                     map.put(Constants.PROTOCOL_KEY, "logstat");
                 } else {
-                    map.put(Constants.PROTOCOL_KEY, "dubbo");
+                    map.put(Constants.PROTOCOL_KEY, Constants.DOBBO_PROTOCOL);
                 }
             }
             return UrlUtils.parseURL(address, map);
         } else if (Constants.REGISTRY_PROTOCOL.equals(monitor.getProtocol()) && registryURL != null) {
-            return registryURL.setProtocol("dubbo").addParameter(Constants.PROTOCOL_KEY, "registry").addParameterAndEncoded(Constants.REFER_KEY, StringUtils.toQueryString(map));
+          return registryURL.setProtocol(Constants.DOBBO_PROTOCOL).addParameter(Constants.PROTOCOL_KEY, Constants.REGISTRY_PROTOCOL).addParameterAndEncoded(Constants.REFER_KEY, StringUtils.toQueryString(map));
         }
         return null;
     }
 
+    static void appendRuntimeParameters(Map<String, String> map) {
+        map.put(Constants.DUBBO_VERSION_KEY, Version.getProtocolVersion());
+        map.put(Constants.SPECIFICATION_VERSION_KEY, Version.getVersion());
+        map.put(Constants.TIMESTAMP_KEY, String.valueOf(System.currentTimeMillis()));
+        if (ConfigUtils.getPid() > 0) {
+            map.put(Constants.PID_KEY, String.valueOf(ConfigUtils.getPid()));
+        }
+    }
+
+    private URL loadMetadataReporterURL(boolean provider) {
+        this.checkApplication();
+        String address = metadataReportConfig.getAddress();
+        if (address == null || address.length() == 0) {
+            return null;
+        }
+        Map<String, String> map = new HashMap<String, String>();
+        map.put(APPLICATION_KEY, application.getName());
+        appendParameters(map, metadataReportConfig);
+        return UrlUtils.parseURL(address, map);
+    }
+
+    protected MetadataReportService getMetadataReportService() {
+
+        if (metadataReportConfig == null || !metadataReportConfig.isValid()) {
+            return null;
+        }
+        return MetadataReportService.instance(() -> {
+            return loadMetadataReporterURL(true);
+        });
+    }
+
+    /**
+     * Check whether the remote service interface and the methods meet with Dubbo's requirements.it mainly check, if the
+     * methods configured in the configuration file are included in the interface of remote service
+     *
+     * @param interfaceClass the interface of remote service
+     * @param methods the methods configured
+     */
     protected void checkInterfaceAndMethods(Class<?> interfaceClass, List<MethodConfig> methods) {
         // interface cannot be null
-        if (interfaceClass == null) {
-            throw new IllegalStateException("interface not allow null!");
-        }
+        Assert.notNull(interfaceClass, new IllegalStateException("interface not allow null!"));
+
         // to verify interfaceClass is an interface
         if (!interfaceClass.isInterface()) {
             throw new IllegalStateException("The interface class " + interfaceClass + " is not a interface!");
         }
-        // check if methods exist in the interface
+        // check if methods exist in the remote service interface
         if (methods != null && !methods.isEmpty()) {
             for (MethodConfig methodBean : methods) {
+                methodBean.setService(interfaceClass.getName());
+                methodBean.setServiceId(this.getId());
+                methodBean.refresh();
                 String methodName = methodBean.getName();
                 if (methodName == null || methodName.length() == 0) {
-                    throw new IllegalStateException("<dubbo:method> name attribute is required! Please check: <dubbo:service interface=\"" + interfaceClass.getName() + "\" ... ><dubbo:method name=\"\" ... /></<dubbo:reference>");
+                    throw new IllegalStateException("<dubbo:method> name attribute is required! Please check: " +
+                            "<dubbo:service interface=\"" + interfaceClass.getName() + "\" ... >" +
+                            "<dubbo:method name=\"\" ... /></<dubbo:reference>");
                 }
-                boolean hasMethod = false;
-                for (java.lang.reflect.Method method : interfaceClass.getMethods()) {
-                    if (method.getName().equals(methodName)) {
-                        hasMethod = true;
-                        break;
-                    }
-                }
+
+                boolean hasMethod = Arrays.stream(interfaceClass.getMethods()).anyMatch(method -> method.getName().equals(methodName));
                 if (!hasMethod) {
                     throw new IllegalStateException("The interface " + interfaceClass.getName()
                             + " not found method " + methodName);
@@ -309,6 +395,13 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
         }
     }
 
+    /**
+     * Legitimacy check and setup of local simulated operations. The operations can be a string with Simple operation or
+     * a classname whose {@link Class} implements a particular function
+     *
+     * @param interfaceClass for provider side, it is the {@link Class} of the service that will be exported; for consumer
+     *                       side, it is the {@link Class} of the remote service interface that will be referenced
+     */
     void checkMock(Class<?> interfaceClass) {
         if (ConfigUtils.isEmpty(mock)) {
             return;
@@ -318,6 +411,7 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
         if (normalizedMock.startsWith(Constants.RETURN_PREFIX)) {
             normalizedMock = normalizedMock.substring(Constants.RETURN_PREFIX.length()).trim();
             try {
+                //Check whether the mock value is legal, if it is illegal, throw exception
                 MockInvoker.parseMockValue(normalizedMock);
             } catch (Exception e) {
                 throw new IllegalStateException("Illegal mock return in <dubbo:service/reference ... " +
@@ -327,6 +421,7 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
             normalizedMock = normalizedMock.substring(Constants.THROW_PREFIX.length()).trim();
             if (ConfigUtils.isNotEmpty(normalizedMock)) {
                 try {
+                    //Check whether the mock value is legal
                     MockInvoker.getThrowable(normalizedMock);
                 } catch (Exception e) {
                     throw new IllegalStateException("Illegal mock throw in <dubbo:service/reference ... " +
@@ -334,33 +429,124 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
                 }
             }
         } else {
+            //Check whether the mock class is a implementation of the interfaceClass, and if it has a default constructor
             MockInvoker.getMockObject(normalizedMock, interfaceClass);
         }
     }
 
-    void checkStub(Class<?> interfaceClass) {
+    /**
+     * Legitimacy check of stub, note that: the local will deprecated, and replace with <code>stub</code>
+     *
+     * @param interfaceClass for provider side, it is the {@link Class} of the service that will be exported; for consumer
+     *                       side, it is the {@link Class} of the remote service interface
+     */
+    void checkStubAndLocal(Class<?> interfaceClass) {
         if (ConfigUtils.isNotEmpty(local)) {
-            Class<?> localClass = ConfigUtils.isDefault(local) ? ReflectUtils.forName(interfaceClass.getName() + "Local") : ReflectUtils.forName(local);
-            if (!interfaceClass.isAssignableFrom(localClass)) {
-                throw new IllegalStateException("The local implementation class " + localClass.getName() + " not implement interface " + interfaceClass.getName());
-            }
-            try {
-                ReflectUtils.findConstructor(localClass, interfaceClass);
-            } catch (NoSuchMethodException e) {
-                throw new IllegalStateException("No such constructor \"public " + localClass.getSimpleName() + "(" + interfaceClass.getName() + ")\" in local implementation class " + localClass.getName());
-            }
+            Class<?> localClass = ConfigUtils.isDefault(local) ?
+                    ReflectUtils.forName(interfaceClass.getName() + "Local") : ReflectUtils.forName(local);
+            verify(interfaceClass, localClass);
         }
         if (ConfigUtils.isNotEmpty(stub)) {
-            Class<?> localClass = ConfigUtils.isDefault(stub) ? ReflectUtils.forName(interfaceClass.getName() + "Stub") : ReflectUtils.forName(stub);
-            if (!interfaceClass.isAssignableFrom(localClass)) {
-                throw new IllegalStateException("The local implementation class " + localClass.getName() + " not implement interface " + interfaceClass.getName());
+            Class<?> localClass = ConfigUtils.isDefault(stub) ?
+                    ReflectUtils.forName(interfaceClass.getName() + "Stub") : ReflectUtils.forName(stub);
+            verify(interfaceClass, localClass);
+        }
+    }
+
+    private void verify(Class<?> interfaceClass, Class<?> localClass) {
+        if (!interfaceClass.isAssignableFrom(localClass)) {
+            throw new IllegalStateException("The local implementation class " + localClass.getName() +
+                    " not implement interface " + interfaceClass.getName());
+        }
+
+        try {
+            //Check if the localClass a contructor with parameter who's type is interfaceClass
+            ReflectUtils.findConstructor(localClass, interfaceClass);
+        } catch (NoSuchMethodException e) {
+            throw new IllegalStateException("No such constructor \"public " + localClass.getSimpleName() +
+                    "(" + interfaceClass.getName() + ")\" in local implementation class " + localClass.getName());
+        }
+    }
+
+    private void overrideParameters(Map<String, String> map) {
+        map.put(Constants.PATH_KEY, RegistryService.class.getName());
+        map.put(Constants.DOBBO_PROTOCOL, Version.getProtocolVersion());
+        map.put(Constants.TIMESTAMP_KEY, String.valueOf(System.currentTimeMillis()));
+        if (ConfigUtils.getPid() > 0) {
+            map.put(Constants.PID_KEY, String.valueOf(ConfigUtils.getPid()));
+        }
+        map.putIfAbsent(Constants.PROTOCOL_KEY, Constants.DOBBO_PROTOCOL);
+    }
+
+    private void convertRegistryIdsToRegistries() {
+        if (StringUtils.isEmpty(registryIds) && (registries == null || registries.isEmpty())) {
+            Set<String> configedRegistries = new HashSet<>();
+            configedRegistries.addAll(getSubProperties(Environment.getInstance().getExternalConfigurationMap(),
+                    Constants.REGISTRIES_SUFFIX));
+            configedRegistries.addAll(getSubProperties(Environment.getInstance().getAppExternalConfigurationMap(),
+                    Constants.REGISTRIES_SUFFIX));
+
+            registryIds = String.join(",", configedRegistries);
+        }
+
+        if (StringUtils.isEmpty(registryIds)) {
+            if (registries == null || registries.isEmpty()) {
+                registries = new ArrayList<>();
+                registries.add(new RegistryConfig());
             }
-            try {
-                ReflectUtils.findConstructor(localClass, interfaceClass);
-            } catch (NoSuchMethodException e) {
-                throw new IllegalStateException("No such constructor \"public " + localClass.getSimpleName() + "(" + interfaceClass.getName() + ")\" in local implementation class " + localClass.getName());
+        } else {
+            String[] arr = Constants.COMMA_SPLIT_PATTERN.split(registryIds);
+            if (registries == null || registries.isEmpty()) {
+                registries = new ArrayList<>();
+            }
+            Arrays.stream(arr).forEach(id -> {
+                if (registries.stream().noneMatch(reg -> reg.getId().equals(id))) {
+                    RegistryConfig registryConfig = new RegistryConfig();
+                    registryConfig.setId(id);
+                    registries.add(registryConfig);
+                }
+            });
+            if (registries.size() > arr.length) {
+                throw new IllegalStateException("Too much registries found, the registries assigned to this service " +
+                        "are :" + registryIds + ", but got " + registries.size() + " registries!");
             }
         }
+
+    }
+
+    private void loadRegistriesFromBackwardConfig() {
+        // for backward compatibility
+        // -Ddubbo.registry.address is now deprecated.
+        if (registries == null || registries.isEmpty()) {
+            String address = ConfigUtils.getProperty("dubbo.registry.address");
+            if (address != null && address.length() > 0) {
+                registries = new ArrayList<RegistryConfig>();
+                String[] as = address.split("\\s*[|]+\\s*");
+                for (String a : as) {
+                    RegistryConfig registryConfig = new RegistryConfig();
+                    registryConfig.setAddress(a);
+                    registries.add(registryConfig);
+                }
+            }
+        }
+    }
+
+    /**
+     * For compatibility purpose, use registry as the default config center if the registry protocol is zookeeper and
+     * there's no config center specified explicitly.
+     */
+    private void useRegistryForConfigIfNecessary() {
+        registries.stream().filter(RegistryConfig::isZookeeperProtocol).findFirst().ifPresent(rc -> {
+            // we use the loading status of DynamicConfiguration to decide whether ConfigCenter has been initiated.
+            Environment.getInstance().getDynamicConfiguration().orElseGet(() -> {
+                ConfigCenterConfig configCenterConfig = new ConfigCenterConfig();
+                configCenterConfig.setProtocol(rc.getProtocol());
+                configCenterConfig.setAddress(rc.getAddress());
+                configCenterConfig.setHighestPriority(false);
+                configCenterConfig.init();
+                return null;
+            });
+        });
     }
 
     /**
@@ -502,6 +688,15 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
         this.registries = (List<RegistryConfig>) registries;
     }
 
+    @Parameter(excluded = true)
+    public String getRegistryIds() {
+        return registryIds;
+    }
+
+    public void setRegistryIds(String registryIds) {
+        this.registryIds = registryIds;
+    }
+
     public MonitorConfig getMonitor() {
         return monitor;
     }
@@ -521,6 +716,14 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
     public void setOwner(String owner) {
         checkMultiName("owner", owner);
         this.owner = owner;
+    }
+
+    public RegistryDataConfig getRegistryDataConfig() {
+        return registryDataConfig;
+    }
+
+    public void setRegistryDataConfig(RegistryDataConfig registryDataConfig) {
+        this.registryDataConfig = registryDataConfig;
     }
 
     public Integer getCallbacks() {
@@ -554,4 +757,13 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
     public void setScope(String scope) {
         this.scope = scope;
     }
+
+    public MetadataReportConfig getMetadataReportConfig() {
+        return metadataReportConfig;
+    }
+
+    public void setMetadataReportConfig(MetadataReportConfig metadataReportConfig) {
+        this.metadataReportConfig = metadataReportConfig;
+    }
+
 }

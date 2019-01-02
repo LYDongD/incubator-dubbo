@@ -173,9 +173,6 @@ public class AnnotationBean extends AbstractConfig implements DisposableBean, Be
                 if (service.module().length() > 0) {
                     serviceConfig.setModule(applicationContext.getBean(service.module(), ModuleConfig.class));
                 }
-                if (service.provider().length() > 0) {
-                    serviceConfig.setProvider(applicationContext.getBean(service.provider(), ProviderConfig.class));
-                }
                 if (service.protocol().length > 0) {
                     List<ProtocolConfig> protocolConfigs = new ArrayList<ProtocolConfig>();
                     for (String protocolId : service.protocol()) {
@@ -242,7 +239,7 @@ public class AnnotationBean extends AbstractConfig implements DisposableBean, Be
                     }
                 }
             } catch (Throwable e) {
-                logger.error("Failed to init remote service reference at filed " + field.getName() + " in class " + bean.getClass().getName() + ", cause: " + e.getMessage(), e);
+                logger.error("Failed to init remote service reference at field " + field.getName() + " in class " + bean.getClass().getName() + ", cause: " + e.getMessage(), e);
             }
         }
         return bean;
