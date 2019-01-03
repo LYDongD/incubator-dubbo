@@ -595,7 +595,7 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
             //创建本地暴露的url，协议指定为injvm, host=127.0.0.1, port=0
             URL local = URL.valueOf(url.toFullString())
                     .setProtocol(Constants.LOCAL_PROTOCOL)
-                    .setHost(LOCALHOST)
+                    .setHost(LOCALHOST);
 
             //通过代理持有（代理工厂创建）服务引用的控制权：invoker, 调用服务即invoker.invoke(invocation),内部调用ref
             //使用协议暴露Invoker
