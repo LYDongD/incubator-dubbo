@@ -16,12 +16,10 @@
  */
 package org.apache.dubbo.config.spring;
 
-<<<<<<< HEAD
+
+import org.apache.dubbo.common.Constants;
 import org.apache.dubbo.common.logger.Logger;
 import org.apache.dubbo.common.logger.LoggerFactory;
-import org.apache.dubbo.config.*;
-=======
-import org.apache.dubbo.common.Constants;
 import org.apache.dubbo.common.utils.StringUtils;
 import org.apache.dubbo.config.ApplicationConfig;
 import org.apache.dubbo.config.MetadataReportConfig;
@@ -32,7 +30,6 @@ import org.apache.dubbo.config.ProviderConfig;
 import org.apache.dubbo.config.RegistryConfig;
 import org.apache.dubbo.config.RegistryDataConfig;
 import org.apache.dubbo.config.ServiceConfig;
->>>>>>> upstream/master
 import org.apache.dubbo.config.annotation.Service;
 import org.apache.dubbo.config.spring.extension.SpringExtensionFactory;
 import org.springframework.aop.support.AopUtils;

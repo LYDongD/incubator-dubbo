@@ -240,6 +240,14 @@ public class ClassHelper {
                 && isPrimitive(method.getParameterTypes()[0]);
     }
 
+    /*
+     *  方法是否为get方法
+     *  1 是否以get/is为前缀
+     *  2 排除以get为前缀但不是get方法的情况
+     *  3 公有方法
+     *  4 不包含参数
+     *  5 返回值为原始类型
+     */
     public static boolean isGetter(Method method) {
         String name = method.getName();
         return (name.startsWith("get") || name.startsWith("is"))

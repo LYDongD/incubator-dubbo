@@ -25,7 +25,7 @@ public class Application {
      */
     public static void main(String[] args) throws Exception {
         //读取classpath下的配置文件，xml格式，并创建容器上下文
-        ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext(new String[]{"META-INF/spring/dubbo-demo-provider.xml"});
+        ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext(new String[]{"spring/dubbo-provider.xml"});
         //lifeCycle方法，用于传递一个容器启动信号,发布ioc容器启动事件：context.start()
         context.start();
         //阻塞方法，从stdin中读取字节

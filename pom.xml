@@ -366,12 +366,7 @@
         <!--资源打包配置-->
         <resources>
             <resource>
-<<<<<<< HEAD
-                <directory>src/main/resources/</directory>
-                <!--是否动态替换资源中的kv-->
-=======
                 <directory>src/main/resources</directory>
->>>>>>> dubbo/master
                 <filtering>false</filtering>
             </resource>
             <resource>
