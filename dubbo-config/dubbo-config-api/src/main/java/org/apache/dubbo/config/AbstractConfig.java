@@ -292,20 +292,6 @@ public abstract class AbstractConfig implements Serializable {
         }
     }
 
-    /**
-     * We only check boolean value at this moment.
-     *
-     * @param type
-     * @param value
-     * @return
-     */
-    private static boolean isTypeMatch(Class<?> type, String value) {
-        if ((type == boolean.class || type == Boolean.class)
-                && !("true".equals(value) || "false".equals(value))) {
-            return false;
-        }
-        return true;
-    }
 
     protected static void checkExtension(Class<?> type, String property, String value) {
         checkName(property, value);
@@ -319,9 +305,9 @@ public abstract class AbstractConfig implements Serializable {
      * Check whether there is a <code>Extension</code> who's name (property) is <code>value</code> (special treatment is
      * required)
      *
-     * @param type The Extension type
+     * @param type     The Extension type
      * @param property The extension key
-     * @param value The Extension name
+     * @param value    The Extension name
      */
     protected static void checkMultiExtension(Class<?> type, String property, String value) {
         checkMultiName(property, value);
@@ -500,12 +486,7 @@ public abstract class AbstractConfig implements Serializable {
         for (Method method : methods) {
             try {
                 String name = method.getName();
-                if ((name.startsWith("get") || name.startsWith("is"))
-                        && !name.equals("get")
-                        && !"getClass".equals(name)
-                        && Modifier.isPublic(method.getModifiers())
-                        && method.getParameterTypes().length == 0
-                        && ClassHelper.isPrimitive(method.getReturnType())) {
+                if (isMetaMethod(method)) {
                     String prop = calculateAttributeFromGetter(name);
                     String key;
                     Parameter parameter = method.getAnnotation(Parameter.class);
@@ -566,7 +547,7 @@ public abstract class AbstractConfig implements Serializable {
             config.addProperties(getMetaData());
             if (Environment.getInstance().isConfigCenterFirst()) {
                 // The sequence would be: SystemConfiguration -> ExternalConfiguration -> AppExternalConfiguration -> AbstractConfig -> PropertiesConfiguration
-                compositeConfiguration.addConfiguration(3,config);
+                compositeConfiguration.addConfiguration(3, config);
             } else {
                 // The sequence would be: SystemConfiguration -> AbstractConfig -> ExternalConfiguration -> AppExternalConfiguration -> PropertiesConfiguration
                 compositeConfiguration.addConfiguration(1, config);
@@ -632,6 +613,29 @@ public abstract class AbstractConfig implements Serializable {
      */
     @Parameter(excluded = true)
     public boolean isValid() {
+        return true;
+    }
+
+    private boolean isMetaMethod(Method method) {
+        String name = method.getName();
+        if (!(name.startsWith("get") || name.startsWith("is"))) {
+            return false;
+        }
+        if ("get".equals(name)) {
+            return false;
+        }
+        if ("getClass".equals(name)) {
+            return false;
+        }
+        if (!Modifier.isPublic(method.getModifiers())) {
+            return false;
+        }
+        if (method.getParameterTypes().length != 0) {
+            return false;
+        }
+        if (!ClassHelper.isPrimitive(method.getReturnType())) {
+            return false;
+        }
         return true;
     }
 
