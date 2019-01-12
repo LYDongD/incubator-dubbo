@@ -258,37 +258,54 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         return unexported;
     }
 
+    //需要检查的属性(https://dubbo.gitbooks.io/dubbo-user-book/references/xml/dubbo-service.html)
     public void checkAndUpdateSubConfigs() {
+        //检查默认配置，这里确保ProviderConig的存在，没有则创建一个
         checkDefault();
+
+        //dubbo配置属性的继承机制，例如，如果配置对象本身没有配置相关属性，可以从其他配置对象当中继承
+
+        //继承provider的配置属性
         if (provider != null) {
             inheritIfAbsentFromProvider();
         }
+
+        //继承module的配置属性
         if (module != null) {
             inheritIfAbsentFromModule();
         }
+
+        //继承application的属性
         if (application != null) {
             inheritIfAbsentFromApplication();
         }
 
+        //检查应用，注册中心和协议配置属性
         checkApplication();
         checkRegistry();
         checkProtocol();
+
         this.refresh();
+
+        //todo 这俩是检查什么?
         checkMetadataReport();
         checkRegistryDataConfig();
 
+        //接口名是必填属性
         if (interfaceName == null || interfaceName.length() == 0) {
             throw new IllegalStateException("<dubbo:service interface=\"\" /> interface not allow null!");
         }
 
-        if (ref instanceof GenericService) {
+        //genericSetvice的作用，参考http://dubbo.apache.org/zh-cn/blog/dubbo-generic-invoke.html
+        //获取暴露接口类
+        if (ref instanceof GenericService) { //generic service
             interfaceClass = GenericService.class;
             if (StringUtils.isEmpty(generic)) {
                 generic = Boolean.TRUE.toString();
             }
-        } else {
+        } else { //非generic service
             try {
-                //反射，根据接口名获取类对象
+                //获取接口类
                 interfaceClass = Class.forName(interfaceName, true, Thread.currentThread()
                         .getContextClassLoader());
             } catch (ClassNotFoundException e) {
@@ -299,6 +316,8 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
             checkRef();
             generic = Boolean.FALSE.toString();
         }
+
+        //如果添加了local=true（本地代理）属性，接口名后缀添加Local，并查找对应类
         if (local != null) {
             if ("true".equals(local)) {
                 local = interfaceName + "Local";
@@ -313,12 +332,15 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                 throw new IllegalStateException("The local implementation class " + localClass.getName() + " not implement interface " + interfaceName);
             }
         }
+
+        //如果添加了stub=strue（使用缺省代理）属性，接口名后添加stub，并查找对应类
         if (stub != null) {
             if ("true".equals(stub)) {
                 stub = interfaceName + "Stub";
             }
             Class<?> stubClass;
             try {
+                //查找代理类
                 stubClass = ClassHelper.forNameWithThreadContextClassLoader(stub);
             } catch (ClassNotFoundException e) {
                 throw new IllegalStateException(e.getMessage(), e);
@@ -331,9 +353,12 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         checkMock(interfaceClass);
     }
 
+    //这里是暴露的入口，服务启动时，根据服务配置进行暴露
     public synchronized void export() {
+        //检查并刷新配置，加载配置中心或系统属性的配置等
         checkAndUpdateSubConfigs();
 
+        //可以继承provider的exporter或delay属性
         if (provider != null) {
             if (export == null) {
                 export = provider.getExport();
@@ -342,10 +367,13 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                 delay = provider.getDelay();
             }
         }
+
+        //是否禁止暴露
         if (export != null && !export) {
             return;
         }
 
+        //如果需要延迟暴露，则延迟执行doExport方法，使用调度线程池实现；否则直接调用doExport方法进行暴露
         if (delay != null && delay > 0) {
             delayExportExecutor.schedule(this::doExport, delay, TimeUnit.MILLISECONDS);
         } else {
@@ -357,16 +385,24 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         if (unexported) {
             throw new IllegalStateException("The service " + interfaceClass.getName() + " has already unexported!");
         }
+
+        //防止重复暴露
         if (exported) {
             return;
         }
         exported = true;
 
+        //path即接口名
         if (path == null || path.length() == 0) {
             path = interfaceName;
         }
+
+        //应用模型初始化提供者模型， 服务名：group/interfaceName/version
         ProviderModel providerModel = new ProviderModel(getUniqueServiceName(), ref, interfaceClass);
+        //将providerModel添加到ApplicaitonModel的提供者列表中，服务名 -> 服务模型
         ApplicationModel.initProviderModel(getUniqueServiceName(), providerModel);
+
+        //基于url进行暴露
         doExportUrls();
     }
 
@@ -864,6 +900,8 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         if (provider == null) {
             provider = new ProviderConfig();
         }
+
+        //todo 这里刷新provider做了什么？
         provider.refresh();
     }
 

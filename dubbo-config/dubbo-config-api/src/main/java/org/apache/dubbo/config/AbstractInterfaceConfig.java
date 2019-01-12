@@ -174,6 +174,7 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
             application = new ApplicationConfig();
         }
 
+        //读取环境变量和properties配置到 ApplicationConfig 对象
         application.refresh();
 
         if (!application.isValid()) {
@@ -183,7 +184,7 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
 
         ApplicationModel.setApplication(application.getName());
 
-        // backward compatibility
+        // backward compatibility 初始化优雅停机的超时时长, 这里涉及dubbo的优雅停机机制
         String wait = ConfigUtils.getProperty(Constants.SHUTDOWN_WAIT_KEY);
         if (wait != null && wait.trim().length() > 0) {
             System.setProperty(Constants.SHUTDOWN_WAIT_KEY, wait.trim());

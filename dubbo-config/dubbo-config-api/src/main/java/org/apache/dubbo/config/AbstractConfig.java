@@ -134,7 +134,7 @@ public abstract class AbstractConfig implements Serializable {
         return value;
     }
 
-    //todo 这里的tag是什么
+    //根据当前配置类获取tag，例如ServiceConfig -> service，tag将作为默认prefix的一部分，例如dubbo.servie.xxx
     private static String getTagName(Class<?> cls) {
         String tag = cls.getSimpleName();
         for (String suffix : SUFFIXES) {
@@ -150,7 +150,7 @@ public abstract class AbstractConfig implements Serializable {
         appendParameters(parameters, config, null);
     }
 
-    //解析config中的方法，并填充到parameters表
+    //解析config中的方法，并填充到parameters表, 即将配置添加到url的参数
     @SuppressWarnings("unchecked")
     protected static void appendParameters(Map<String, String> parameters, Object config, String prefix) {
         if (config == null) {
@@ -215,7 +215,7 @@ public abstract class AbstractConfig implements Serializable {
                     } else if (parameter != null && parameter.required()) { //@parameter要求改参数，但是没取到值则抛出异常
                         throw new IllegalStateException(config.getClass().getSimpleName() + "." + key + " == null");
                     }
-                } else if ("getParameters".equals(name) //fixme 这里其实也可以放在ClassHelper处理
+                    } else if ("getParameters".equals(name) //fixme 这里其实也可以放在ClassHelper处理
                         && Modifier.isPublic(method.getModifiers())
                         && method.getParameterTypes().length == 0
                         && method.getReturnType() == Map.class) {
@@ -238,30 +238,41 @@ public abstract class AbstractConfig implements Serializable {
         appendAttributes(parameters, config, null);
     }
 
+    //todo 拼接参数和拼接属性的区别是什么? 同样是将配置添加到url的参数表
     protected static void appendAttributes(Map<String, Object> parameters, Object config, String prefix) {
         if (config == null) {
             return;
         }
+        //通过反射，获取配置对象的所有方法并解析
         Method[] methods = config.getClass().getMethods();
         for (Method method : methods) {
             try {
+                //优先解析方法的parameter注解
                 Parameter parameter = method.getAnnotation(Parameter.class);
                 if (parameter == null || !parameter.attribute()) {
                     continue;
                 }
+
+                //获取方法名，解析后可能作为参数名
                 String name = method.getName();
+
+                //由于是获取配置。所以只解析合法的get方法
                 if (ClassHelper.isGetter(method)) {
+                    //解析key，即配置名
                     String key;
                     if (parameter.key().length() > 0) {
                         key = parameter.key();
                     } else {
                         key = calculateAttributeFromGetter(name);
                     }
+                    //通过反射动态调用get方法获取配置
                     Object value = method.invoke(config);
+                    //拼接前缀，规则是key = prefix.key
                     if (value != null) {
                         if (prefix != null && prefix.length() > 0) {
                             key = prefix + "." + key;
                         }
+                        //如果能获取到非空的配置值，则写入参数表
                         parameters.put(key, value);
                     }
                 }
@@ -554,6 +565,7 @@ public abstract class AbstractConfig implements Serializable {
         return metaData;
     }
 
+    //如果prefix为空，则使用默认的前缀: dubbo.service
     @Parameter(excluded = true)
     public String getPrefix() {
         return StringUtils.isNotEmpty(prefix) ? prefix : (Constants.DUBBO + "." + getTagName(this.getClass()));
@@ -569,9 +581,12 @@ public abstract class AbstractConfig implements Serializable {
      */
     public void refresh() {
         try {
+            //从环境变量中，根据前缀例如dubbo.service和id加载配置，该属性可能通过-Ddubbo.service.xxx 添加
             CompositeConfiguration compositeConfiguration = Environment.getInstance().getConfiguration(getPrefix(), getId());
+
             InmemoryConfiguration config = new InmemoryConfiguration(getPrefix(), getId());
             config.addProperties(getMetaData());
+            //调整配置优先级，后面的会覆盖前面的
             if (Environment.getInstance().isConfigCenterFirst()) {
                 // The sequence would be: SystemConfiguration -> ExternalConfiguration -> AppExternalConfiguration -> AbstractConfig -> PropertiesConfiguration
                 compositeConfiguration.addConfiguration(3, config);
@@ -581,6 +596,7 @@ public abstract class AbstractConfig implements Serializable {
             }
 
             // loop methods, get override value and set the new value back to method
+            // 反射调用配置对象的set方法，调整属性值
             Method[] methods = getClass().getMethods();
             for (Method method : methods) {
                 if (ClassHelper.isSetter(method)) {
