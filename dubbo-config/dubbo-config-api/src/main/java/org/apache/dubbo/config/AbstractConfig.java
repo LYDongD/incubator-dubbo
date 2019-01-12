@@ -102,6 +102,7 @@ public abstract class AbstractConfig implements Serializable {
      */
     private static final String[] SUFFIXES = new String[]{"Config", "Bean"};
 
+    //TODO 该hash表legacyProperties的作用是？ 并没有哪里使用该表
     static {
         legacyProperties.put("dubbo.protocol.name", "dubbo.service.protocol");
         legacyProperties.put("dubbo.protocol.host", "dubbo.service.server.host");
@@ -133,6 +134,7 @@ public abstract class AbstractConfig implements Serializable {
         return value;
     }
 
+    //todo 这里的tag是什么
     private static String getTagName(Class<?> cls) {
         String tag = cls.getSimpleName();
         for (String suffix : SUFFIXES) {
@@ -148,56 +150,79 @@ public abstract class AbstractConfig implements Serializable {
         appendParameters(parameters, config, null);
     }
 
+    //解析config中的方法，并填充到parameters表
     @SuppressWarnings("unchecked")
     protected static void appendParameters(Map<String, String> parameters, Object config, String prefix) {
         if (config == null) {
             return;
         }
+
+        //获取配置包含的方法列表(反射)
         Method[] methods = config.getClass().getMethods();
         for (Method method : methods) {
             try {
                 String name = method.getName();
+                //对getter方法和getParameter方法进行解析
                 if (ClassHelper.isGetter(method)) {
+
+                    //获取注解@parameter并进行处理，可以通过注解的excluded属性排除不需要的参数
                     Parameter parameter = method.getAnnotation(Parameter.class);
+                    //FIXME ClassHelper已经对返回类型进行判断，不需要再次判断
                     if (method.getReturnType() == Object.class || parameter != null && parameter.excluded()) {
                         continue;
                     }
+
+                    //根据方法及其注解 解析key
                     String key;
+                    //优先从注解@parameter获取key
                     if (parameter != null && parameter.key().length() > 0) {
                         key = parameter.key();
-                    } else {
+                    } else { //解析方法名得到key
                         key = calculatePropertyFromGetter(name);
                     }
+
+                    //反射调用方法获取配置值，作为参数的value
                     Object value = method.invoke(config);
                     String str = String.valueOf(value).trim();
+
+                    //fixme 这里直接判断str即可，如果value=null,前面已经抛出异常
                     if (value != null && str.length() > 0) {
+                        //如果注解@parameter声明该值需要转义（utf-8编码，可能是包含中文），则进行转义
                         if (parameter != null && parameter.escaped()) {
                             str = URL.encode(str);
                         }
+                        //如果注解@parameter要求该值拼接，则进行拼接
                         if (parameter != null && parameter.append()) {
+                            //获取该key的默认前缀：default.[key], 和默认前缀进行拼接
                             String pre = parameters.get(Constants.DEFAULT_KEY + "." + key);
                             if (pre != null && pre.length() > 0) {
                                 str = pre + "," + str;
                             }
+
+                            //和该key的其他值进行拼接
                             pre = parameters.get(key);
                             if (pre != null && pre.length() > 0) {
                                 str = pre + "," + str;
                             }
                         }
+
+                        //为key拼接前缀
                         if (prefix != null && prefix.length() > 0) {
                             key = prefix + "." + key;
                         }
+                        //设置参数
                         parameters.put(key, str);
-                    } else if (parameter != null && parameter.required()) {
+                    } else if (parameter != null && parameter.required()) { //@parameter要求改参数，但是没取到值则抛出异常
                         throw new IllegalStateException(config.getClass().getSimpleName() + "." + key + " == null");
                     }
-                } else if ("getParameters".equals(name)
+                } else if ("getParameters".equals(name) //fixme 这里其实也可以放在ClassHelper处理
                         && Modifier.isPublic(method.getModifiers())
                         && method.getParameterTypes().length == 0
                         && method.getReturnType() == Map.class) {
                     Map<String, String> map = (Map<String, String>) method.invoke(config, new Object[0]);
                     if (map != null && map.size() > 0) {
                         String pre = (prefix != null && prefix.length() > 0 ? prefix + "." : "");
+                        //为key添加前缀，如果key中包含-，则替换成.
                         for (Map.Entry<String, String> entry : map.entrySet()) {
                             parameters.put(pre + entry.getKey().replace('-', '.'), entry.getValue());
                         }
@@ -408,7 +433,9 @@ public abstract class AbstractConfig implements Serializable {
         return propertyName;
     }
 
+    //根据名称得到key,解析规则为：将驼峰式的单词转换为用.分隔，小写，例如getPersonName => person.name
     private static String calculatePropertyFromGetter(String name) {
+        //这里其实是区分is/get前缀
         int i = name.startsWith("get") ? 3 : 2;
         return StringUtils.camelToSplitName(name.substring(i, i + 1).toLowerCase() + name.substring(i + 1), ".");
     }
