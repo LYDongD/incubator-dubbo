@@ -408,11 +408,13 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
             return;
         }
 
+        //标准化mock的属性值
         String normalizedMock = MockInvoker.normalizeMock(mock);
         if (normalizedMock.startsWith(Constants.RETURN_PREFIX)) {
             normalizedMock = normalizedMock.substring(Constants.RETURN_PREFIX.length()).trim();
             try {
-                //Check whether the mock value is legal, if it is illegal, throw exception
+                //Check whether the mock value is legal, if it is illegal, throw exception，
+                // 解析并检查return的结果是否合法，仅支持empty，null，true/false, JSON对象
                 MockInvoker.parseMockValue(normalizedMock);
             } catch (Exception e) {
                 throw new IllegalStateException("Illegal mock return in <dubbo:service/reference ... " +
@@ -423,6 +425,7 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
             if (ConfigUtils.isNotEmpty(normalizedMock)) {
                 try {
                     //Check whether the mock value is legal
+                    // 解析并检查throw异常是否合法，throwstr必须是一个异常类
                     MockInvoker.getThrowable(normalizedMock);
                 } catch (Exception e) {
                     throw new IllegalStateException("Illegal mock throw in <dubbo:service/reference ... " +
@@ -431,6 +434,7 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
             }
         } else {
             //Check whether the mock class is a implementation of the interfaceClass, and if it has a default constructor
+            //FIXME 这里只是检查逻辑，没有必要实例化一个mock对象，而且该对象未被缓存
             MockInvoker.getMockObject(normalizedMock, interfaceClass);
         }
     }
@@ -443,13 +447,18 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
      */
     void checkStubAndLocal(Class<?> interfaceClass) {
         if (ConfigUtils.isNotEmpty(local)) {
+            //加载默认或自定义的local实现
             Class<?> localClass = ConfigUtils.isDefault(local) ?
                     ReflectUtils.forName(interfaceClass.getName() + "Local") : ReflectUtils.forName(local);
             verify(interfaceClass, localClass);
         }
+
+        //加载默认或自定义的stub实现，默认配置，例如<dubbo:service interface="com.foo.BarService" stub="true" />， stub=true
         if (ConfigUtils.isNotEmpty(stub)) {
             Class<?> localClass = ConfigUtils.isDefault(stub) ?
                     ReflectUtils.forName(interfaceClass.getName() + "Stub") : ReflectUtils.forName(stub);
+
+            //实现类必须是引用接口的实现类或以接口作为实现类的构造器参数
             verify(interfaceClass, localClass);
         }
     }

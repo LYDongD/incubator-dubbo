@@ -231,6 +231,7 @@ public class NetUtils {
         if (LOCAL_ADDRESS != null) {
             return LOCAL_ADDRESS;
         }
+        //获取网络接口address0的ip
         InetAddress localAddress = getLocalAddress0();
         LOCAL_ADDRESS = localAddress;
         return localAddress;

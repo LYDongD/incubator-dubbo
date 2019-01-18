@@ -120,6 +120,7 @@ public final class Version {
         }
     }
 
+    //优先使用jar包内MANIFEST.MF指定的version
     public static String getVersion(Class<?> cls, String defaultVersion) {
         try {
             // find version info from MANIFEST.MF first
@@ -127,6 +128,7 @@ public final class Version {
             if (version == null || version.length() == 0) {
                 version = cls.getPackage().getSpecificationVersion();
             }
+            //获取接口源码文件的版本
             if (version == null || version.length() == 0) {
                 // guess version fro jar file name if nothing's found from MANIFEST.MF
                 CodeSource codeSource = cls.getProtectionDomain().getCodeSource();
@@ -157,6 +159,7 @@ public final class Version {
                 }
             }
             // return default version if no version info is found
+            //基于文件查找版本，没有找到则使用默认version，即ref引用指定的版本
             return version == null || version.length() == 0 ? defaultVersion : version;
         } catch (Throwable e) {
             // return default version when any exception is thrown

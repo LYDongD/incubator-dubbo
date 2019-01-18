@@ -127,6 +127,7 @@ final public class MockInvoker<T> implements Invoker<T> {
     }
 
     public static Throwable getThrowable(String throwstr) {
+        //使用缓存，避免重复检查
         Throwable throwable = throwables.get(throwstr);
         if (throwable != null) {
             return throwable;
@@ -187,6 +188,7 @@ final public class MockInvoker<T> implements Invoker<T> {
 
     /**
      * Normalize mock string:
+     * 标准化mock字符串
      *
      * <ol>
      * <li>return => return null</li>
@@ -210,22 +212,27 @@ final public class MockInvoker<T> implements Invoker<T> {
             return mock;
         }
 
+        //支持mock="return" -> "return null"
         if (Constants.RETURN_KEY.equalsIgnoreCase(mock)) {
             return Constants.RETURN_PREFIX + "null";
         }
 
+        //仅配置fail,force,true或default，则返回"default"
         if (ConfigUtils.isDefault(mock) || "fail".equalsIgnoreCase(mock) || "force".equalsIgnoreCase(mock)) {
             return "default";
         }
 
+        //mock="fail:xxx"，提取fail后的字符串
         if (mock.startsWith(Constants.FAIL_PREFIX)) {
             mock = mock.substring(Constants.FAIL_PREFIX.length()).trim();
         }
 
+        //mock="force:xxx"，提取force后的字符串
         if (mock.startsWith(Constants.FORCE_PREFIX)) {
             mock = mock.substring(Constants.FORCE_PREFIX.length()).trim();
         }
 
+        //mock="return"或mock="throw" 的特殊处理
         if (mock.startsWith(Constants.RETURN_PREFIX) || mock.startsWith(Constants.THROW_PREFIX)) {
             mock = mock.replace('`', '"');
         }
