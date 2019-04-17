@@ -32,6 +32,7 @@ import java.util.List;
 
 /**
  * NettyCodecAdapter.
+ * 将dubbo的编解码器适配成netty的编解码器
  */
 final class NettyCodecAdapter {
 
@@ -63,8 +64,10 @@ final class NettyCodecAdapter {
 
         @Override
         protected void encode(ChannelHandlerContext ctx, Object msg, ByteBuf out) throws Exception {
+            //netty byteBuf -> dubbo NettyBackedChannelBuffer
             org.apache.dubbo.remoting.buffer.ChannelBuffer buffer = new NettyBackedChannelBuffer(out);
             Channel ch = ctx.channel();
+            //netty channel -> dubbo NettyChannel
             NettyChannel channel = NettyChannel.getOrAddChannel(ch, url, handler);
             try {
                 codec.encode(channel, buffer, msg);
@@ -87,6 +90,7 @@ final class NettyCodecAdapter {
 
             int saveReaderIndex;
 
+            //循环解析，直到消息解析为空
             try {
                 // decode object.
                 do {

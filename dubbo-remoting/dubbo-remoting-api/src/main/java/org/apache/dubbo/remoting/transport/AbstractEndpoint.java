@@ -29,6 +29,7 @@ import org.apache.dubbo.remoting.transport.codec.CodecAdapter;
 
 /**
  * AbstractEndpoint
+ * 处理超时timeout, connectTimeout和编解码codec，并提供重置能力
  */
 public abstract class AbstractEndpoint extends AbstractPeer implements Resetable {
 
@@ -49,6 +50,8 @@ public abstract class AbstractEndpoint extends AbstractPeer implements Resetable
 
     protected static Codec2 getChannelCodec(URL url) {
         String codecName = url.getParameter(Constants.CODEC_KEY, "telnet");
+
+        //SPI，根据codec参数值，加载指定的codec,例如DubboCodec
         if (ExtensionLoader.getExtensionLoader(Codec2.class).hasExtension(codecName)) {
             return ExtensionLoader.getExtensionLoader(Codec2.class).getExtension(codecName);
         } else {

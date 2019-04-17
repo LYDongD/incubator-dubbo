@@ -30,6 +30,7 @@ import java.net.InetSocketAddress;
 
 /**
  * AbstractCodec
+ * 检验消息长度，判断端角色等
  */
 public abstract class AbstractCodec implements Codec2 {
 

@@ -379,7 +379,7 @@ public class DubboProtocol extends AbstractProtocol {
     @Override
     public <T> Invoker<T> refer(Class<T> serviceType, URL url) throws RpcException {
         optimizeSerialization(url);
-        // create rpc invoker.
+        // create rpc invoker. 需要获取客户端并生成DubboInvoker
         DubboInvoker<T> invoker = new DubboInvoker<T>(serviceType, url, getClients(url), invokers);
         invokers.add(invoker);
         return invoker;
@@ -388,6 +388,7 @@ public class DubboProtocol extends AbstractProtocol {
     private ExchangeClient[] getClients(URL url) {
         // whether to share connection
         boolean service_share_connect = false;
+        //解析connections属性，如果没有配置，默认为0，表示共享一个长连接；否则一个引用一个链接
         int connections = url.getParameter(Constants.CONNECTIONS_KEY, 0);
         // if not configured, connection is shared, otherwise, one connection for one service
         if (connections == 0) {
@@ -398,8 +399,10 @@ public class DubboProtocol extends AbstractProtocol {
         ExchangeClient[] clients = new ExchangeClient[connections];
         for (int i = 0; i < clients.length; i++) {
             if (service_share_connect) {
+                //获取共享客户端
                 clients[i] = getSharedClient(url);
             } else {
+                //初始化新的客户端
                 clients[i] = initClient(url);
             }
         }
@@ -414,6 +417,7 @@ public class DubboProtocol extends AbstractProtocol {
         ReferenceCountExchangeClient client = referenceClientMap.get(key);
         if (client != null) {
             if (!client.isClosed()) {
+                // 增加客户端的引用计数，注意确保线程安全
                 client.incrementAndGetCount();
                 return client;
             } else {
@@ -421,16 +425,23 @@ public class DubboProtocol extends AbstractProtocol {
             }
         }
 
+        //添加锁
         locks.putIfAbsent(key, new Object());
+        //同一时刻只能操作一个地址
         synchronized (locks.get(key)) {
+            //如果共享客户端已经存在，不必重复创建，直接返回即可
             if (referenceClientMap.containsKey(key)) {
                 return referenceClientMap.get(key);
             }
 
+            //初始化client
             ExchangeClient exchangeClient = initClient(url);
+            //生成具备引用计数能力的client
             client = new ReferenceCountExchangeClient(exchangeClient, ghostClientMap);
+            //缓存
             referenceClientMap.put(key, client);
             ghostClientMap.remove(key);
+            //是否锁
             locks.remove(key);
             return client;
         }

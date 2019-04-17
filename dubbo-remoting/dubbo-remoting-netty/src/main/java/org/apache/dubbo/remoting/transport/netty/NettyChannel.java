@@ -33,6 +33,7 @@ import java.util.concurrent.ConcurrentMap;
 
 /**
  * NettyChannel.
+ * 装饰器，包装netty的channel，真正实现连接，消息收发等事件处理
  */
 final class NettyChannel extends AbstractChannel {
 

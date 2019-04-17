@@ -45,21 +45,26 @@ import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * AbstractClient
+ * 处理重连，抽象连接，开关等模板方法，初始化线程池模型
  */
 public abstract class AbstractClient extends AbstractEndpoint implements Client {
 
     protected static final String CLIENT_THREAD_POOL_NAME = "DubboClientHandler";
     private static final Logger logger = LoggerFactory.getLogger(AbstractClient.class);
     private static final AtomicInteger CLIENT_THREAD_POOL_ID = new AtomicInteger();
+    //重连定时器，后台任务，定时检查连接，如果断开则进行重连
     private static final ScheduledThreadPoolExecutor reconnectExecutorService = new ScheduledThreadPoolExecutor(2, new NamedThreadFactory("DubboClientReconnectTimer", true));
     private final Lock connectLock = new ReentrantLock();
+    //发送消息时，如果断开，是否重连
     private final boolean send_reconnect;
     private final AtomicInteger reconnect_count = new AtomicInteger(0);
     // Reconnection error log has been called before?
     private final AtomicBoolean reconnect_error_log_flag = new AtomicBoolean(false);
     // reconnect warning period. Reconnect warning interval (log warning after how many times) //for test
     private final int reconnect_warning_period;
+    //超过多少s没有连接成功，则认为是shutdown
     private final long shutdown_timeout;
+    //初始化线程池模型
     protected volatile ExecutorService executor;
     private volatile ScheduledFuture<?> reconnectExecutorFuture = null;
     // the last successed connected time
@@ -105,6 +110,7 @@ public abstract class AbstractClient extends AbstractEndpoint implements Client 
                             + " connect to the server " + getRemoteAddress() + ", cause: " + t.getMessage(), t);
         }
 
+        //消费端线程池
         executor = (ExecutorService) ExtensionLoader.getExtensionLoader(DataStore.class)
                 .getDefaultExtension().get(Constants.CONSUMER_SIDE, Integer.toString(url.getPort()));
         ExtensionLoader.getExtensionLoader(DataStore.class)
@@ -145,7 +151,7 @@ public abstract class AbstractClient extends AbstractEndpoint implements Client 
      * init reconnect thread
      */
     private synchronized void initConnectStatusCheckCommand() {
-        //reconnect=false to close reconnect
+        //reconnect=false to close reconnect， 默认开启
         int reconnect = getReconnectParam(getUrl());
         if (reconnect > 0 && (reconnectExecutorFuture == null || reconnectExecutorFuture.isCancelled())) {
             Runnable connectStatusCheckCommand = new Runnable() {
@@ -157,9 +163,9 @@ public abstract class AbstractClient extends AbstractEndpoint implements Client 
                         } else {
                             lastConnectedTime = System.currentTimeMillis();
                         }
-                    } catch (Throwable t) {
+                    } catch (Throwable t) { //日志优化，不重复打印重连失败日志
                         String errorMsg = "client reconnect to " + getUrl().getAddress() + " find error . url: " + getUrl();
-                        // wait registry sync provider list
+                        // wait registry sync provider list， 超过一定时间才打印错误日志，通过flag标记，该日志仅打印一次
                         if (System.currentTimeMillis() - lastConnectedTime > shutdown_timeout) {
                             if (!reconnect_error_log_flag.get()) {
                                 reconnect_error_log_flag.set(true);
@@ -167,12 +173,14 @@ public abstract class AbstractClient extends AbstractEndpoint implements Client 
                                 return;
                             }
                         }
+                        //周期性打印warn日志，
                         if (reconnect_count.getAndIncrement() % reconnect_warning_period == 0) {
                             logger.warn(errorMsg, t);
                         }
                     }
                 }
             };
+            //发起定时任务
             reconnectExecutorFuture = reconnectExecutorService.scheduleWithFixedDelay(connectStatusCheckCommand, reconnect, reconnect, TimeUnit.MILLISECONDS);
         }
     }
@@ -278,6 +286,7 @@ public abstract class AbstractClient extends AbstractEndpoint implements Client 
             if (isConnected()) {
                 return;
             }
+            //初始化重连线程
             initConnectStatusCheckCommand();
             doConnect();
             if (!isConnected()) {

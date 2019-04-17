@@ -47,11 +47,13 @@ import java.util.Map;
 
 /**
  * NettyServer
+ * server的netty实现，开关netty服务器
  */
 public class NettyServer extends AbstractServer implements Server {
 
     private static final Logger logger = LoggerFactory.getLogger(NettyServer.class);
 
+    //客户端通道集合
     private Map<String, Channel> channels; // <ip:port, channel>
 
     private ServerBootstrap bootstrap;
@@ -69,6 +71,7 @@ public class NettyServer extends AbstractServer implements Server {
     protected void doOpen() throws Throwable {
         bootstrap = new ServerBootstrap();
 
+        //创建线程组
         bossGroup = new NioEventLoopGroup(1, new DefaultThreadFactory("NettyServerBoss", true));
         workerGroup = new NioEventLoopGroup(getUrl().getPositiveParameter(Constants.IO_THREADS_KEY, Constants.DEFAULT_IO_THREADS),
                 new DefaultThreadFactory("NettyServerWorker", true));
@@ -101,6 +104,7 @@ public class NettyServer extends AbstractServer implements Server {
     @Override
     protected void doClose() throws Throwable {
         try {
+            // 关闭服务器通道
             if (channel != null) {
                 // unbind.
                 channel.close();
@@ -109,6 +113,7 @@ public class NettyServer extends AbstractServer implements Server {
             logger.warn(e.getMessage(), e);
         }
         try {
+            // 关闭连接到服务器的客户端通道
             Collection<org.apache.dubbo.remoting.Channel> channels = getChannels();
             if (channels != null && channels.size() > 0) {
                 for (org.apache.dubbo.remoting.Channel channel : channels) {
@@ -123,6 +128,7 @@ public class NettyServer extends AbstractServer implements Server {
             logger.warn(e.getMessage(), e);
         }
         try {
+            // 优雅关闭工作组
             if (bootstrap != null) {
                 bossGroup.shutdownGracefully();
                 workerGroup.shutdownGracefully();
@@ -131,6 +137,7 @@ public class NettyServer extends AbstractServer implements Server {
             logger.warn(e.getMessage(), e);
         }
         try {
+            // 清空连接到服务器的客户端通道
             if (channels != null) {
                 channels.clear();
             }

@@ -23,6 +23,7 @@ import org.apache.dubbo.remoting.RemotingException;
 
 /**
  * AbstractChannel
+ * 发送前检查连接是否正常
  */
 public abstract class AbstractChannel extends AbstractPeer implements Channel {
 

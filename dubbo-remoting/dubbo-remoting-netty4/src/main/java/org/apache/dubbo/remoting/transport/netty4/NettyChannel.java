@@ -34,17 +34,22 @@ import java.util.concurrent.ConcurrentMap;
 
 /**
  * NettyChannel.
+ * 装饰器，包装netty的channel，真正实现连接，消息收发等事件处理
  */
 final class NettyChannel extends AbstractChannel {
 
     private static final Logger logger = LoggerFactory.getLogger(NettyChannel.class);
 
+    //通道集合
     private static final ConcurrentMap<Channel, NettyChannel> channelMap = new ConcurrentHashMap<Channel, NettyChannel>();
 
+    //netty的通道, 装饰器模式
     private final Channel channel;
 
+    //属性集合
     private final Map<String, Object> attributes = new ConcurrentHashMap<String, Object>();
 
+    //dubbo的nettyChannel封装了netty的channel
     private NettyChannel(Channel channel, URL url, ChannelHandler handler) {
         super(url, handler);
         if (channel == null) {
@@ -53,6 +58,7 @@ final class NettyChannel extends AbstractChannel {
         this.channel = channel;
     }
 
+    //优先从缓存获取NettyChannel
     static NettyChannel getOrAddChannel(Channel ch, URL url, ChannelHandler handler) {
         if (ch == null) {
             return null;
@@ -93,12 +99,15 @@ final class NettyChannel extends AbstractChannel {
 
     @Override
     public void send(Object message, boolean sent) throws RemotingException {
+        //检查连接的状态，如果连接已经关闭，则抛出异常
         super.send(message, sent);
 
         boolean success = true;
         int timeout = 0;
         try {
+            //发送消息
             ChannelFuture future = channel.writeAndFlush(message);
+            //sent:是否等待消息发送成功,如需等待，则等待指定时间，默认1s
             if (sent) {
                 timeout = getUrl().getPositiveParameter(Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT);
                 success = future.await(timeout);
@@ -117,6 +126,7 @@ final class NettyChannel extends AbstractChannel {
         }
     }
 
+    //关闭通道，清空各种缓存
     @Override
     public void close() {
         try {
@@ -138,6 +148,7 @@ final class NettyChannel extends AbstractChannel {
             if (logger.isInfoEnabled()) {
                 logger.info("Close netty channel " + channel);
             }
+            //关闭netty的channel
             channel.close();
         } catch (Exception e) {
             logger.warn(e.getMessage(), e);

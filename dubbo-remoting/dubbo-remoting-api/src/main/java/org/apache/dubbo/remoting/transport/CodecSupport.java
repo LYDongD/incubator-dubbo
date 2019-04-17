@@ -31,9 +31,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+//保存和获取序列化对象
 public class CodecSupport {
 
     private static final Logger logger = LoggerFactory.getLogger(CodecSupport.class);
+    //缓存序列化对象和序列化名，通过序列化编号唯一标识
     private static Map<Byte, Serialization> ID_SERIALIZATION_MAP = new HashMap<Byte, Serialization>();
     private static Map<Byte, String> ID_SERIALIZATIONNAME_MAP = new HashMap<Byte, String>();
 
@@ -61,6 +63,7 @@ public class CodecSupport {
         return ID_SERIALIZATION_MAP.get(id);
     }
 
+    //根据serialization扩展序列化协议，默认hessian2
     public static Serialization getSerialization(URL url) {
         return ExtensionLoader.getExtensionLoader(Serialization.class).getExtension(
                 url.getParameter(Constants.SERIALIZATION_KEY, Constants.DEFAULT_REMOTING_SERIALIZATION));

@@ -28,6 +28,7 @@ import io.netty.channel.ChannelPromise;
 
 /**
  * NettyClientHandler
+ * 委托dubbo的ChannelHandler完成信道消息处理
  */
 @io.netty.channel.ChannelHandler.Sharable
 public class NettyClientHandler extends ChannelDuplexHandler {

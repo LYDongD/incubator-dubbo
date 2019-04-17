@@ -23,8 +23,14 @@ import org.apache.dubbo.remoting.Dispatcher;
 import org.apache.dubbo.remoting.exchange.support.header.HeartbeatHandler;
 import org.apache.dubbo.remoting.transport.MultiMessageHandler;
 
+
+/**
+ *  通道处理器工厂，统一包装ChannelHandler
+ *  无论是NettyClient还是NettyServer,都需要通过该类实现包装,该工厂实现handler分发
+ */
 public class ChannelHandlers {
 
+    //单例
     private static ChannelHandlers INSTANCE = new ChannelHandlers();
 
     protected ChannelHandlers() {

@@ -40,15 +40,18 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * NettyClient.
+ * 基于netty的客户端，建立连接，添加编解码器/通道处理器等
  */
 public class NettyClient extends AbstractClient {
 
     private static final Logger logger = LoggerFactory.getLogger(NettyClient.class);
 
+    //共享一个线程组
     private static final NioEventLoopGroup nioEventLoopGroup = new NioEventLoopGroup(Constants.DEFAULT_IO_THREADS, new DefaultThreadFactory("NettyClientWorker", true));
 
     private Bootstrap bootstrap;
 
+    //保证netty chennel的可见性
     private volatile Channel channel; // volatile, please copy reference to use
 
     public NettyClient(final URL url, final ChannelHandler handler) throws RemotingException {
@@ -66,6 +69,7 @@ public class NettyClient extends AbstractClient {
                 //.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, getTimeout())
                 .channel(NioSocketChannel.class);
 
+        //设置连接超时时间，至少3s
         if (getConnectTimeout() < 3000) {
             bootstrap.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 3000);
         } else {
@@ -90,12 +94,13 @@ public class NettyClient extends AbstractClient {
         long start = System.currentTimeMillis();
         ChannelFuture future = bootstrap.connect(getConnectAddress());
         try {
+            // 等待连接成功或者超时
             boolean ret = future.awaitUninterruptibly(getConnectTimeout(), TimeUnit.MILLISECONDS);
 
             if (ret && future.isSuccess()) {
                 Channel newChannel = future.channel();
                 try {
-                    // Close old channel
+                    // Close old channel 关闭老的连接，持有新的连接
                     Channel oldChannel = NettyClient.this.channel; // copy reference
                     if (oldChannel != null) {
                         try {
@@ -108,7 +113,7 @@ public class NettyClient extends AbstractClient {
                         }
                     }
                 } finally {
-                    if (NettyClient.this.isClosed()) {
+                    if (NettyClient.this.isClosed()) { //如果netty client 被关闭，则关闭连接
                         try {
                             if (logger.isInfoEnabled()) {
                                 logger.info("Close new netty channel " + newChannel + ", because the client closed.");
@@ -118,7 +123,7 @@ public class NettyClient extends AbstractClient {
                             NettyClient.this.channel = null;
                             NettyChannel.removeChannelIfDisconnected(newChannel);
                         }
-                    } else {
+                    } else { //持有新的连接
                         NettyClient.this.channel = newChannel;
                     }
                 }

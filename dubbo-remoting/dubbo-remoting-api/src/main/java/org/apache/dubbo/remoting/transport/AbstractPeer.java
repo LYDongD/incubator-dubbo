@@ -25,9 +25,11 @@ import org.apache.dubbo.remoting.RemotingException;
 
 /**
  * AbstractPeer
+ * 装饰通道处理器，并处理sent属性
  */
 public abstract class AbstractPeer implements Endpoint, ChannelHandler {
 
+    //装饰器模式
     private final ChannelHandler handler;
 
     private volatile URL url;

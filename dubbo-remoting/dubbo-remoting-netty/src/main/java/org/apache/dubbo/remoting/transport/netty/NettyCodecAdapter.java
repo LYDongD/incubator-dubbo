@@ -56,6 +56,7 @@ final class NettyCodecAdapter {
         this.codec = codec;
         this.url = url;
         this.handler = handler;
+        //初始化bufferSize, [1M, 16M], default 8M, 用于数据接收处理
         int b = url.getPositiveParameter(Constants.BUFFER_KEY, Constants.DEFAULT_BUFFER_SIZE);
         this.bufferSize = b >= Constants.MIN_BUFFER_SIZE && b <= Constants.MAX_BUFFER_SIZE ? b : Constants.DEFAULT_BUFFER_SIZE;
     }
